@@ -111,7 +111,7 @@ Workflow `.github/workflows/web-build.yml` на каждый пуш собира
 Установка на чистый Ubuntu 22.04/24.04 (под root, домен должен указывать на IP сервера):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lenar95/English-for-turism/claude/relaxed-archimedes-kfq2pv/deploy/install.sh | bash -s -- ваш.домен
+curl -fsSL https://raw.githubusercontent.com/lenar95/English-for-turism/claude/relaxed-archimedes-kfq2pv/deploy/install.sh | bash -s -- ваш.домен ваш@email
 ```
 
 Скрипт ставит Caddy с автоматическим HTTPS от Let's Encrypt (без HTTPS браузер не даст доступ к микрофону)

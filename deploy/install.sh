@@ -2,7 +2,10 @@
 # Установка веб-версии «Английский в поездку» на VPS (Ubuntu 22.04/24.04).
 #
 # Запуск на сервере под root:
-#   curl -fsSL https://raw.githubusercontent.com/lenar95/English-for-turism/claude/relaxed-archimedes-kfq2pv/deploy/install.sh | bash -s -- ваш.домен
+#   curl -fsSL https://raw.githubusercontent.com/lenar95/English-for-turism/claude/relaxed-archimedes-kfq2pv/deploy/install.sh | bash -s -- ваш.домен ваш@email
+#
+# Email нужен центрам сертификации: без него не работает запасной центр ZeroSSL,
+# а Let's Encrypt может отказать, если на общий домен хостинга уже выпущено слишком много сертификатов.
 #
 # Что делает:
 #   1. Ставит Caddy (веб-сервер с автоматическим HTTPS от Let's Encrypt) и git.
@@ -12,12 +15,14 @@
 set -euo pipefail
 
 DOMAIN="${1:-${DOMAIN:-}}"
+EMAIL="${2:-${EMAIL:-}}"
 REPO="${REPO:-https://github.com/lenar95/English-for-turism.git}"
 BRANCH="${BRANCH:-web-build}"
 WEB_DIR=/var/www/english-for-tourism
 
 if [[ $EUID -ne 0 ]]; then echo "Запустите под root (sudo)." >&2; exit 1; fi
-if [[ -z "$DOMAIN" ]]; then echo "Укажите домен: bash install.sh example.com" >&2; exit 1; fi
+if [[ -z "$DOMAIN" ]]; then echo "Укажите домен: bash install.sh example.com you@example.com" >&2; exit 1; fi
+if [[ -z "$EMAIL" ]]; then echo "Предупреждение: email не указан, запасной центр сертификации ZeroSSL работать не будет." >&2; fi
 
 echo "==> Устанавливаю пакеты"
 export DEBIAN_FRONTEND=noninteractive
@@ -73,7 +78,10 @@ systemctl daemon-reload
 systemctl enable --now english-for-tourism-update.timer
 
 echo "==> Настраиваю Caddy для $DOMAIN"
+GLOBAL=""
+if [[ -n "$EMAIL" ]]; then GLOBAL=$'{\n\temail '"$EMAIL"$'\n}\n'; fi
 cat > /etc/caddy/Caddyfile <<CADDY
+$GLOBAL
 $DOMAIN {
 	root * $WEB_DIR
 	encode zstd gzip
