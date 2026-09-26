@@ -1,4 +1,4 @@
-import { STAGES, scenarios } from '../data';
+import { STAGES, cities, scenarios } from '../data';
 import { useApp } from '../state/AppContext';
 
 /** Выбор ситуаций, которые понадобятся в поездке. */
@@ -52,6 +52,22 @@ export function TripDetails() {
           value={data.trip.destination}
           onChange={(e) => updateTrip({ destination: e.target.value })}
         />
+      </div>
+      <div className="field">
+        <label htmlFor="trip-city">Набор для города</label>
+        <select
+          id="trip-city"
+          className="input"
+          value={data.trip.cityId}
+          onChange={(e) => updateTrip({ cityId: e.target.value })}
+        >
+          <option value="">Без города — только общие ситуации</option>
+          {cities.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.emoji} {c.name}, {c.country}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="field">
         <label htmlFor="trip-date">Дата вылета</label>

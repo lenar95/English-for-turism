@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { IconSearch } from '../components/Icons';
 import { PhraseCard } from '../components/PhraseCard';
-import { allPhrases, scenarios } from '../data';
+import { allPhrases, allScenarios } from '../data';
 
 const norm = (s: string) => s.toLowerCase().replace(/ё/g, 'е').replace(/[’']/g, "'");
 
@@ -40,7 +40,7 @@ export function PhrasebookPage() {
       <div className="row">
         <select className="input grow" value={scenarioId} onChange={(e) => setScenarioId(e.target.value)} aria-label="Ситуация">
           <option value="">Все ситуации</option>
-          {scenarios.map((s) => (
+          {allScenarios.map((s) => (
             <option key={s.id} value={s.id}>
               {s.emoji} {s.title}
             </option>

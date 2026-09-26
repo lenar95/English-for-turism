@@ -14,7 +14,8 @@ import { restaurant } from './scenarios/restaurant';
 import { shopping } from './scenarios/shopping';
 import { sightseeing } from './scenarios/sightseeing';
 import { transfer } from './scenarios/transfer';
-import type { Phrase, Scenario, Stage } from './types';
+import { istanbul } from './cities/istanbul';
+import type { CityPack, Phrase, Scenario, Stage } from './types';
 
 /** Сценарии в порядке маршрута поездки. */
 export const scenarios: Scenario[] = [
@@ -45,7 +46,15 @@ export const STAGES: { id: Stage; title: string }[] = [
   { id: 'departure', title: 'Отъезд' },
 ];
 
-export const scenarioById: Record<string, Scenario> = Object.fromEntries(scenarios.map((s) => [s.id, s]));
+/** Наборы для конкретных городов. */
+export const cities: CityPack[] = [istanbul];
+
+export const cityById: Record<string, CityPack> = Object.fromEntries(cities.map((c) => [c.id, c]));
+
+/** Все ситуации: общие и городские. */
+export const allScenarios: Scenario[] = [...scenarios, ...cities.flatMap((c) => c.scenarios)];
+
+export const scenarioById: Record<string, Scenario> = Object.fromEntries(allScenarios.map((s) => [s.id, s]));
 
 export interface PhraseRef {
   phrase: Phrase;
@@ -53,7 +62,7 @@ export interface PhraseRef {
 }
 
 export const phraseById: Record<string, PhraseRef> = Object.fromEntries(
-  scenarios.flatMap((scenario) => scenario.phrases.map((phrase) => [phrase.id, { phrase, scenario }])),
+  allScenarios.flatMap((scenario) => scenario.phrases.map((phrase) => [phrase.id, { phrase, scenario }])),
 );
 
 export const allPhrases: PhraseRef[] = Object.values(phraseById);

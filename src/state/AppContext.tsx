@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
-import { scenarioById, scenarios } from '../data';
+import { cityById, phraseById, scenarioById, scenarios } from '../data';
 import type { Scenario } from '../data/types';
 import type { AnswerKind } from '../lib/memory';
 import { recognitionAvailable, recognitionLikelyAvailable } from '../lib/speech/recognition';
@@ -44,13 +44,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (loaded.current) saveData(data);
   }, [data]);
 
-  const mustSpeak = (id: string) => {
-    for (const s of scenarios) {
-      const p = s.phrases.find((x) => x.id === id);
-      if (p) return p.speaker === 'you';
-    }
-    return true;
-  };
+  const mustSpeak = (id: string) => phraseById[id]?.phrase.speaker !== 'them';
 
   const answer = useCallback((phraseId: string, correct: boolean, kind: AnswerKind) => {
     dispatch({ type: 'answer', phraseId, correct, kind, mustSpeak: mustSpeak(phraseId), now: Date.now() });
@@ -66,9 +60,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const tripScenarios = useMemo(() => {
     const ids = data.trip.scenarioIds;
-    if (!ids.length) return scenarios;
-    return ids.map((id) => scenarioById[id]).filter((s): s is Scenario => Boolean(s));
-  }, [data.trip.scenarioIds]);
+    const general = ids.length
+      ? ids.map((id) => scenarioById[id]).filter((s): s is Scenario => Boolean(s))
+      : scenarios;
+    const city = cityById[data.trip.cityId];
+    return city ? [...general, ...city.scenarios] : general;
+  }, [data.trip.scenarioIds, data.trip.cityId]);
 
   const value: AppContextValue = {
     data,

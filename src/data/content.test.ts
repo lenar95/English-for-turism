@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scenarios } from '.';
+import { allScenarios as scenarios, cities } from '.';
 import { scorePronunciation } from '../lib/pronunciation';
 
 describe('контент', () => {
@@ -30,6 +30,17 @@ describe('контент', () => {
       const speakers = d.lines.map((l) => s.phrases.find((p) => p.id === l.phraseId)!.speaker);
       expect(speakers).toContain('you');
       expect(speakers).toContain('them');
+    }
+  });
+
+  it('городские наборы: у ситуаций задан город, id с префиксом города, есть местные слова', () => {
+    for (const c of cities) {
+      expect(c.localLanguage.words.length).toBeGreaterThan(0);
+      for (const w of c.localLanguage.words) expect(w.tr).not.toMatch(/[a-z]/i);
+      for (const s of c.scenarios) {
+        expect(s.cityId).toBe(c.id);
+        expect(s.id.startsWith(`${c.id}-`)).toBe(true);
+      }
     }
   });
 

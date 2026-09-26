@@ -4,14 +4,25 @@ import { speak, stopSpeaking } from '../lib/speech/tts';
 import { IconSpeaker, IconTurtle } from './Icons';
 
 /** Кнопки «прослушать» и «прослушать медленно». */
-export function SpeakButtons({ text, showSlow = true, autoPlay = false }: { text: string; showSlow?: boolean; autoPlay?: boolean }) {
+export function SpeakButtons({
+  text,
+  showSlow = true,
+  autoPlay = false,
+  lang,
+}: {
+  text: string;
+  showSlow?: boolean;
+  autoPlay?: boolean;
+  /** Язык фразы, если она не английская. */
+  lang?: string;
+}) {
   const { data } = useApp();
   const [playing, setPlaying] = useState<'normal' | 'slow' | null>(null);
 
   const play = async (slow: boolean) => {
     setPlaying(slow ? 'slow' : 'normal');
     try {
-      await speak(text, { accent: data.settings.accent, slow });
+      await speak(text, { accent: data.settings.accent, slow, lang });
     } finally {
       setPlaying(null);
     }

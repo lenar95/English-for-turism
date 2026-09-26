@@ -48,4 +48,37 @@ export interface Scenario {
   dialogues: Dialogue[];
   /** Практические советы по ситуации (по-русски). */
   tips: string[];
+  /** Если задан — ситуация из городского набора. */
+  cityId?: string;
+}
+
+/** Слово на местном языке (не английском) — для вежливости и базовых ситуаций. */
+export interface LocalWord {
+  /** Слово или фраза на местном языке. */
+  text: string;
+  ru: string;
+  /** Произношение русскими буквами. */
+  tr: string;
+}
+
+/** Набор для конкретного города: местные нюансы поверх общих ситуаций. */
+export interface CityPack {
+  id: string;
+  name: string;
+  country: string;
+  emoji: string;
+  /** Коротко: чем город отличается и к чему готовиться. */
+  intro: string;
+  /** Общие советы по городу. */
+  tips: string[];
+  localLanguage: {
+    /** Наречие для подписей: «по-турецки». */
+    name: string;
+    /** BCP 47 для озвучки, например tr-TR. */
+    lang: string;
+    note: string;
+    words: LocalWord[];
+  };
+  /** Ситуации города. У каждой задан cityId. */
+  scenarios: Scenario[];
 }

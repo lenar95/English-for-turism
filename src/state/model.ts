@@ -16,6 +16,8 @@ export interface Trip {
   date: string;
   /** Выбранные ситуации. Пустой список = все. */
   scenarioIds: string[];
+  /** Городской набор (например, istanbul). Пустая строка — без города. */
+  cityId: string;
 }
 
 export interface ExamRecord {
@@ -44,7 +46,7 @@ export const defaultData = (): AppData => ({
   onboarded: false,
   progress: {},
   exams: [],
-  trip: { destination: '', date: '', scenarioIds: [] },
+  trip: { destination: '', date: '', scenarioIds: [], cityId: '' },
   settings: { accent: 'en-US', showTranscription: true, pronunciation: true },
   activeDays: [],
 });

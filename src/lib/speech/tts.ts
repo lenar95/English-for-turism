@@ -6,6 +6,8 @@ export type Accent = 'en-US' | 'en-GB';
 export interface SpeakOptions {
   accent: Accent;
   slow?: boolean;
+  /** Язык, если фраза не английская (например, tr-TR для турецких слов). */
+  lang?: string;
 }
 
 const NORMAL_RATE = 0.95;
@@ -31,11 +33,12 @@ if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
   window.speechSynthesis.addEventListener?.('voiceschanged', loadVoices);
 }
 
-function pickVoice(accent: Accent): SpeechSynthesisVoice | undefined {
+function pickVoice(accent: string): SpeechSynthesisVoice | undefined {
   const voices = loadVoices();
   const norm = (l: string) => l.replace('_', '-').toLowerCase();
   const exact = voices.filter((v) => norm(v.lang) === accent.toLowerCase());
-  const english = voices.filter((v) => norm(v.lang).startsWith('en'));
+  const base = accent.slice(0, 2).toLowerCase();
+  const english = voices.filter((v) => norm(v.lang).startsWith(base));
   const candidates = exact.length ? exact : english;
   for (const name of PREFERRED_VOICES) {
     const v = candidates.find((c) => c.name.includes(name));
@@ -50,12 +53,13 @@ export function ttsAvailable(): boolean {
 }
 
 /** Произнести английскую фразу. Промис завершается, когда фраза договорена. */
-export async function speak(text: string, { accent, slow }: SpeakOptions): Promise<void> {
+export async function speak(text: string, { accent, slow, lang }: SpeakOptions): Promise<void> {
+  const language = lang ?? accent;
   const rate = slow ? SLOW_RATE : NORMAL_RATE;
   const clean = text.replace(/[’]/g, "'");
   if (Capacitor.isNativePlatform()) {
     await TextToSpeech.stop().catch(() => undefined);
-    await TextToSpeech.speak({ text: clean, lang: accent, rate, category: 'playback' });
+    await TextToSpeech.speak({ text: clean, lang: language, rate, category: 'playback' });
     return;
   }
   if (!ttsAvailable()) return;
@@ -63,9 +67,9 @@ export async function speak(text: string, { accent, slow }: SpeakOptions): Promi
   synth.cancel();
   await new Promise<void>((resolve) => {
     const u = new SpeechSynthesisUtterance(clean);
-    u.lang = accent;
+    u.lang = language;
     u.rate = rate;
-    const voice = pickVoice(accent);
+    const voice = pickVoice(language);
     if (voice) u.voice = voice;
     u.onend = () => resolve();
     u.onerror = () => resolve();

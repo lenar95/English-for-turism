@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { IconArrow, IconBrain, IconTarget, IconWave } from '../components/Icons';
 import { LevelBadge, Metric, Ring } from '../components/Readiness';
 import { ScenarioItem } from '../components/ScenarioItem';
+import { cities, cityById } from '../data';
 import { isDue } from '../lib/memory';
 import { readinessLevel, scenarioReadiness, tripReadiness } from '../lib/readiness';
 import { streak } from '../state/model';
@@ -33,6 +34,7 @@ export function HomePage() {
   const weakest = [...perScenario].sort((a, b) => a.r.total - b.r.total)[0];
   const days = daysUntil(data.trip.date, now);
   const series = streak(data.activeDays, now);
+  const city = cityById[data.trip.cityId];
 
   return (
     <div className="page">
@@ -97,6 +99,22 @@ export function HomePage() {
             <br />
             <span className="muted">Готовность {weakest.r.total}%. {weakest.s.goal}</span>
           </span>
+        </Link>
+      )}
+
+      {city ? (
+        <Link to={`/city/${city.id}`} className="scenario-item">
+          <span className="scenario-item__emoji" aria-hidden>{city.emoji}</span>
+          <span className="grow stack stack--sm">
+            <span className="scenario-item__title">Набор «{city.name}»</span>
+            <span className="small muted">Местные нюансы и слова {city.localLanguage.name}</span>
+          </span>
+          <IconArrow width={20} height={20} />
+        </Link>
+      ) : (
+        <Link to="/scenarios" className="banner" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <span aria-hidden style={{ fontSize: 22 }}>🏙️</span>
+          <span className="grow">Есть наборы для городов ({cities.map((c) => c.name).join(', ')}): местные нюансы, которых нет в общих ситуациях.</span>
         </Link>
       )}
 

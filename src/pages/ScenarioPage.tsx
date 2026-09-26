@@ -28,7 +28,7 @@ export function ScenarioPage() {
 
   return (
     <div className="page">
-      <TopBar back="/scenarios" title={scenario.title} />
+      <TopBar back={scenario.cityId ? `/city/${scenario.cityId}` : '/scenarios'} title={scenario.title} />
       <header className="row">
         <span className="big-emoji" aria-hidden>{scenario.emoji}</span>
         <div className="grow stack stack--sm">

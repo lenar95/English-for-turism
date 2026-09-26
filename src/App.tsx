@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { TabBar } from './components/Layout';
+import { CityPage } from './pages/CityPage';
 import { DialoguePage } from './pages/DialoguePage';
 import { HomePage } from './pages/HomePage';
 import { OnboardingPage } from './pages/OnboardingPage';
@@ -32,6 +33,7 @@ function Shell() {
         <Route path="/" element={<HomePage />} />
         <Route path="/scenarios" element={<ScenariosPage />} />
         <Route path="/scenario/:id" element={<ScenarioPage />} />
+        <Route path="/city/:id" element={<CityPage />} />
         <Route path="/scenario/:id/dialogue/:did" element={<DialoguePage />} />
         <Route path="/practice/:scope" element={<SessionPage key="practice" mode="practice" />} />
         <Route path="/exam/:scope" element={<SessionPage key="exam" mode="exam" />} />
