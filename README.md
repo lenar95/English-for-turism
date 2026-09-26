@@ -103,6 +103,20 @@ npm run build      # сборка в dist/
 Workflow `.github/workflows/pages.yml` публикует сайт при пуше в `main`. Один раз включите
 **Settings → Pages → Source: GitHub Actions**.
 
+### Веб-версия на своём сервере (VPS)
+
+Workflow `.github/workflows/web-build.yml` на каждый пуш собирает сайт и кладёт готовые файлы в ветку `web-build`.
+Сервер раз в 2 минуты сам подтягивает эту ветку, поэтому ключи и пароли от сервера в GitHub хранить не нужно.
+
+Установка на чистый Ubuntu 22.04/24.04 (под root, домен должен указывать на IP сервера):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/lenar95/English-for-turism/claude/relaxed-archimedes-kfq2pv/deploy/install.sh | bash -s -- ваш.домен
+```
+
+Скрипт ставит Caddy с автоматическим HTTPS от Let's Encrypt (без HTTPS браузер не даст доступ к микрофону)
+и таймер автообновления. Логи: `journalctl -u caddy -f`, обновления: `journalctl -u english-for-tourism-update`.
+
 ### iOS-приложение
 
 Нужен Mac с Xcode 16 или новее. Зависимости iOS подключаются через Swift Package Manager, CocoaPods не нужен.
