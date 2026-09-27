@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ExerciseRunner, type Outcome } from '../components/ExerciseRunner';
 import { SessionResult, scoreSession } from '../components/SessionResult';
 import { scenarioById } from '../data';
-import { buildExam, buildPracticeSession } from '../lib/exercises';
+import { createAdaptiveSession, fixedSource, type SessionMode } from '../lib/adaptive';
+import { buildExam } from '../lib/exercises';
+import { sessionInsight } from '../lib/insights';
+import { dailyPlan, readMotivation } from '../lib/motivation';
 import { useApp } from '../state/AppContext';
 
 /**
@@ -12,6 +15,9 @@ import { useApp } from '../state/AppContext';
  */
 export function SessionPage({ mode }: { mode: 'practice' | 'exam' }) {
   const { scope = 'trip' } = useParams();
+  const [search] = useSearchParams();
+  const sessionMode: SessionMode = mode === 'exam' ? 'normal' : ((search.get('m') as SessionMode | null) ?? 'normal');
+  const size = sessionMode === 'normal' ? 10 : 5;
   const navigate = useNavigate();
   const app = useApp();
   const [round, setRound] = useState(0);
@@ -22,13 +28,30 @@ export function SessionPage({ mode }: { mode: 'practice' | 'exam' }) {
   const backTo = scenario ? `/scenario/${scenario.id}` : '/';
 
   // Набор заданий фиксируется на время раунда, чтобы не перестраиваться после каждого ответа.
-  const exercises = useMemo(
+  // Если к вылету всё не успеть, план сужается до ключевых фраз — тренировка тоже.
+  const now = Date.now();
+  const focusKey = dailyPlan(
+    pool,
+    app.data.progress,
+    app.data.answers,
+    app.data.trip.date,
+    readMotivation(app.data.answers, app.data.sessions, app.data.activeDays, now),
+    now,
+  ).focusKey;
+  const source = useMemo(
     () =>
       mode === 'exam'
-        ? buildExam(pool, app.speechOn, scenario ? 10 : 20)
-        : buildPracticeSession(pool, app.data.progress, Date.now(), app.speechOn, 10),
+        ? fixedSource(buildExam(pool, app.speechOn, scenario ? 10 : 20))
+        : createAdaptiveSession(pool, app.data.progress, Date.now(), app.speechOn, size, sessionMode, Math.random, focusKey),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [round, scope, mode, app.ready],
+    [round, scope, mode, sessionMode, app.ready],
+  );
+
+  // Выбираем «открытие» один раз на результат, чтобы оно не менялось при перерисовке.
+  const insight = useMemo(
+    () => (outcomes && mode === 'practice' ? sessionInsight(outcomes, app.data, pool, Date.now()) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [outcomes],
   );
 
   if (!app.ready) return null;
@@ -38,7 +61,11 @@ export function SessionPage({ mode }: { mode: 'practice' | 'exam' }) {
 
   const title = mode === 'exam'
     ? `Проверка готовности · ${scenario ? scenario.title : 'вся поездка'}`
-    : `Тренировка · ${scenario ? scenario.title : 'вся поездка'}`;
+    : sessionMode === 'warmup'
+      ? 'Разминка после перерыва'
+      : sessionMode === 'minimal'
+        ? 'Одна минута'
+        : `Тренировка · ${scenario ? scenario.title : 'вся поездка'}`;
 
   if (outcomes) {
     const score = scoreSession(outcomes, app.speechOn);
@@ -48,6 +75,7 @@ export function SessionPage({ mode }: { mode: 'practice' | 'exam' }) {
         outcomes={outcomes}
         score={score}
         exam={mode === 'exam'}
+        insight={insight}
         onRetry={() => {
           setOutcomes(null);
           setRound((r) => r + 1);
@@ -61,7 +89,8 @@ export function SessionPage({ mode }: { mode: 'practice' | 'exam' }) {
   return (
     <ExerciseRunner
       key={round}
-      exercises={exercises}
+      source={source}
+      kind={mode === 'exam' ? 'exam' : sessionMode === 'normal' ? 'practice' : sessionMode}
       mode={mode}
       onExit={() => navigate(backTo)}
       onFinish={(all) => {

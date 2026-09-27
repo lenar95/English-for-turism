@@ -3,6 +3,8 @@ import { scenarioReadiness, tripReadiness, type ProgressMap } from './readiness'
 
 export interface Badge {
   id: string;
+  /** badge — значок; can — новая компетенция («теперь вы можете…»). */
+  kind: 'badge' | 'can';
   emoji: string;
   title: string;
   /** Что нужно сделать, чтобы получить значок. */
@@ -11,6 +13,8 @@ export interface Badge {
 
 /** Готовность ситуации, с которой она считается освоенной. */
 export const SCENARIO_MASTERED = 80;
+/** Готовность, с которой человек уже справится с ситуацией («теперь вы можете…»). */
+export const SCENARIO_CAN = 60;
 
 export interface BadgeInput {
   progress: ProgressMap;
@@ -21,7 +25,7 @@ export interface BadgeInput {
   speechOn: boolean;
 }
 
-interface BadgeRule extends Badge {
+interface BadgeRule extends Omit<Badge, 'kind'> {
   earned: (i: BadgeInput) => boolean;
 }
 
@@ -54,13 +58,27 @@ const GENERAL: BadgeRule[] = [
 
 /** Все значки, доступные в текущей поездке: общие и по одному на каждую ситуацию. */
 export function allBadges(input: BadgeInput): (Badge & { earned: boolean })[] {
-  const general = GENERAL.map(({ earned, ...b }) => ({ ...b, earned: earned(input) }));
-  const perScenario = input.tripScenarios.map((s) => ({
-    id: `scenario:${s.id}`,
-    emoji: s.emoji,
-    title: s.title,
-    hint: `Готовность ${SCENARIO_MASTERED}% в ситуации`,
-    earned: scenarioReadiness(s, input.progress, input.now, input.speechOn).total >= SCENARIO_MASTERED,
-  }));
+  const general = GENERAL.map(({ earned, ...b }) => ({ ...b, kind: 'badge' as const, earned: earned(input) }));
+  const perScenario = input.tripScenarios.flatMap((s) => {
+    const total = scenarioReadiness(s, input.progress, input.now, input.speechOn).total;
+    return [
+      {
+        id: `can:${s.id}`,
+        kind: 'can' as const,
+        emoji: s.emoji,
+        title: s.goal,
+        hint: `Готовность ${SCENARIO_CAN}% в ситуации «${s.title}»`,
+        earned: total >= SCENARIO_CAN,
+      },
+      {
+        id: `scenario:${s.id}`,
+        kind: 'badge' as const,
+        emoji: s.emoji,
+        title: s.title,
+        hint: `Готовность ${SCENARIO_MASTERED}% в ситуации`,
+        earned: total >= SCENARIO_MASTERED,
+      },
+    ];
+  });
   return [...general, ...perScenario];
 }

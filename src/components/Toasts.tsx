@@ -13,6 +13,7 @@ export function Toasts() {
   }, [current, dismissToast]);
   if (!current) return null;
   const isScenario = current.id.startsWith('scenario:');
+  const isCan = current.kind === 'can';
   return (
     <div className="toast-wrap" role="status" aria-live="polite">
       <button type="button" className="toast" key={current.id} onClick={() => dismissToast(current.id)}>
@@ -22,10 +23,10 @@ export function Toasts() {
         </span>
         <span style={{ textAlign: 'left' }}>
           <span className="tiny muted" style={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Новый значок
+            {isCan ? 'Теперь вы можете' : 'Новый значок'}
           </span>
           <br />
-          <b>{isScenario ? `${current.title}: освоено!` : current.title}</b>
+          <b>{isCan ? current.title : isScenario ? `${current.title}: освоено!` : current.title}</b>
         </span>
       </button>
     </div>

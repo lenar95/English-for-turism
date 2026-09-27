@@ -32,9 +32,11 @@ interface Props {
   backTo: string;
   backLabel: string;
   exam?: boolean;
+  /** Небольшое «открытие» о прогрессе (показывается не всегда). */
+  insight?: string | null;
 }
 
-export function SessionResult({ title, outcomes, score, onRetry, backTo, backLabel, exam }: Props) {
+export function SessionResult({ title, outcomes, score, onRetry, backTo, backLabel, exam, insight }: Props) {
   const { data } = useApp();
   const level = readinessLevel(score.total);
   const mistakes = outcomes.filter((o) => o.memoryCorrect === false || (o.pronScore !== undefined && o.pronScore < 65));
@@ -50,6 +52,12 @@ export function SessionResult({ title, outcomes, score, onRetry, backTo, backLab
         {exam && <span className={`level-badge tone-${level.tone}`}>{level.label}</span>}
         <p className="small muted">{exam ? level.description : 'Прогресс сохранён. Регулярные короткие тренировки работают лучше, чем одна длинная.'}</p>
       </div>
+      {insight && (
+        <div className="insight pop">
+          <span aria-hidden>✨</span>
+          <span>{insight}</span>
+        </div>
+      )}
       <div className="card stack">
         <Metric icon={<IconBrain width={16} height={16} />} label="Память" value={score.memory} />
         <Metric

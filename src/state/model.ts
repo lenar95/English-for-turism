@@ -30,6 +30,26 @@ export interface ExamRecord {
   questions: number;
 }
 
+/** Один ответ пользователя — для оценки точности и дневного прогресса. */
+export interface AnswerEvent {
+  t: number;
+  phraseId: string;
+  ok: boolean;
+}
+
+export type SessionKind = 'practice' | 'minimal' | 'warmup' | 'exam' | 'dialogue';
+
+/** Одна сессия занятий — для оценки вовлечённости (досрочные выходы, длительность). */
+export interface SessionLog {
+  start: number;
+  end: number;
+  kind: SessionKind;
+  planned: number;
+  done: number;
+  correct: number;
+  exitedEarly: boolean;
+}
+
 export interface AppData {
   version: 1;
   onboarded: boolean;
@@ -41,6 +61,12 @@ export interface AppData {
   activeDays: string[];
   /** Полученные значки (id). Однажды полученный значок не отнимается. */
   badges: string[];
+  /** Последние ответы (до 300). */
+  answers: AnswerEvent[];
+  /** Последние сессии (до 100). */
+  sessions: SessionLog[];
+  /** Сколько дней в неделю заниматься (цель недели). */
+  weeklyGoal: number;
 }
 
 export const defaultData = (): AppData => ({
@@ -52,7 +78,22 @@ export const defaultData = (): AppData => ({
   settings: { accent: 'en-US', showTranscription: true, pronunciation: true },
   activeDays: [],
   badges: [],
+  answers: [],
+  sessions: [],
+  weeklyGoal: 4,
 });
+
+/**
+ * Добавить ответ. Несколько оценок одной фразы в пределах 20 секунд
+ * (например, память и произношение одного задания) считаются одним ответом.
+ */
+function pushAnswer(list: AnswerEvent[], ev: AnswerEvent): AnswerEvent[] {
+  const last = list[list.length - 1];
+  if (last && last.phraseId === ev.phraseId && ev.t - last.t < 20000) {
+    return [...list.slice(0, -1), { ...last, t: ev.t, ok: last.ok && ev.ok }];
+  }
+  return [...list, ev].slice(-300);
+}
 
 export function dayKey(ts: number): string {
   const d = new Date(ts);
@@ -75,6 +116,8 @@ export type Action =
   | { type: 'settings'; settings: Partial<Settings> }
   | { type: 'onboarded' }
   | { type: 'badges'; ids: string[] }
+  | { type: 'session'; log: SessionLog }
+  | { type: 'weeklyGoal'; days: number }
   | { type: 'reset' };
 
 export function reducer(data: AppData, action: Action): AppData {
@@ -91,6 +134,7 @@ export function reducer(data: AppData, action: Action): AppData {
         ...data,
         progress: { ...data.progress, [action.phraseId]: next },
         activeDays: markActive(data, action.now),
+        answers: pushAnswer(data.answers, { t: action.now, phraseId: action.phraseId, ok: action.correct }),
       };
     }
     case 'pronunciation': {
@@ -99,6 +143,7 @@ export function reducer(data: AppData, action: Action): AppData {
         ...data,
         progress: { ...data.progress, [action.phraseId]: pushPron(prev, action.score) },
         activeDays: markActive(data, action.now),
+        answers: pushAnswer(data.answers, { t: action.now, phraseId: action.phraseId, ok: action.score >= 65 }),
       };
     }
     case 'exam':
@@ -109,6 +154,10 @@ export function reducer(data: AppData, action: Action): AppData {
       return { ...data, settings: { ...data.settings, ...action.settings } };
     case 'onboarded':
       return { ...data, onboarded: true };
+    case 'session':
+      return { ...data, sessions: [...data.sessions, action.log].slice(-100) };
+    case 'weeklyGoal':
+      return { ...data, weeklyGoal: Math.max(1, Math.min(7, action.days)) };
     case 'badges':
       return { ...data, badges: [...data.badges, ...action.ids.filter((id) => !data.badges.includes(id))] };
     case 'reset':
@@ -145,5 +194,8 @@ export function migrate(raw: unknown): AppData {
     exams: r.exams ?? [],
     activeDays: r.activeDays ?? [],
     badges: r.badges ?? [],
+    answers: r.answers ?? [],
+    sessions: r.sessions ?? [],
+    weeklyGoal: r.weeklyGoal ?? 4,
   };
 }

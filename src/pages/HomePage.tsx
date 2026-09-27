@@ -2,11 +2,11 @@ import { Link } from 'react-router-dom';
 import { BoardingPass } from '../components/BoardingPass';
 import { IconArrow, IconTarget } from '../components/Icons';
 import { RouteMap } from '../components/RouteMap';
+import { TodayPlan, WeekDots } from '../components/TodayPlan';
 import { stageStyle } from '../components/stage';
 import { cities, cityById } from '../data';
-import { isDue } from '../lib/memory';
+import { activeThisWeek, dailyPlan, readMotivation, rememberedShare } from '../lib/motivation';
 import { scenarioReadiness, tripReadiness } from '../lib/readiness';
-import { streak } from '../state/model';
 import { useApp } from '../state/AppContext';
 
 function daysUntil(date: string, now: number): number | null {
@@ -30,11 +30,13 @@ export function HomePage() {
   const now = Date.now();
   const trip = tripReadiness(tripScenarios, data.progress, now, speechOn);
   const perScenario = tripScenarios.map((s) => ({ s, r: scenarioReadiness(s, data.progress, now, speechOn) }));
-  const due = tripScenarios.flatMap((s) => s.phrases).filter((p) => isDue(data.progress[p.id]?.memory, now)).length;
   const weakest = [...perScenario].sort((a, b) => a.r.total - b.r.total)[0];
   const days = daysUntil(data.trip.date, now);
-  const series = streak(data.activeDays, now);
   const city = cityById[data.trip.cityId];
+  const reading = readMotivation(data.answers, data.sessions, data.activeDays, now);
+  const plan = dailyPlan(tripScenarios, data.progress, data.answers, data.trip.date, reading, now);
+  const week = activeThisWeek(data.activeDays, now);
+  const can = tripScenarios.filter((s) => data.badges.includes(`can:${s.id}`));
 
   return (
     <div className="page">
@@ -43,13 +45,7 @@ export function HomePage() {
           <p className="home-hello">{greeting(now)}</p>
           <h1>Английский в поездку</h1>
         </div>
-        {series > 0 && (
-          <span className="streak" title="Дней подряд">
-            🔥 {series}
-          </span>
-        )}
       </header>
-
       <BoardingPass
         destination={data.trip.destination}
         city={city}
@@ -59,16 +55,29 @@ export function HomePage() {
         speechOn={speechOn}
       />
 
-      <section className="stack">
-        <Link to="/practice/trip" className="btn btn--block btn--lg">
-          {due > 0 ? `Повторить фразы · ${due}` : 'Тренировка на 5 минут'}
-          <IconArrow />
-        </Link>
-        <Link to="/exam/trip" className="btn btn--secondary btn--block">
-          <IconTarget />
-          Проверить готовность к поездке
-        </Link>
-      </section>
+      <WeekDots days={week.days} count={week.count} goal={data.weeklyGoal} />
+
+      <TodayPlan plan={plan} reading={reading} remembered={rememberedShare(tripScenarios, data.progress, now)} />
+
+
+      {can.length > 0 && (
+        <section className="card stack">
+          <h3>Вы уже можете</h3>
+          <ul className="can-list">
+            {can.map((s) => (
+              <li key={s.id}>
+                <span aria-hidden>{s.emoji}</span>
+                <span>{s.goal}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <Link to="/exam/trip" className="btn btn--secondary btn--block">
+        <IconTarget />
+        Проверить готовность к поездке
+      </Link>
 
       {weakest && weakest.r.total < 85 && (
         <Link to={`/scenario/${weakest.s.id}`} className="tip-card" style={stageStyle(weakest.s.stage)}>

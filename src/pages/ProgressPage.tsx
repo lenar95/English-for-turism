@@ -2,7 +2,9 @@ import { Link } from 'react-router-dom';
 import { Ring } from '../components/Readiness';
 import { scenarioById } from '../data';
 import { scenarioReadiness, tripReadiness, MEMORY_WEIGHT } from '../lib/readiness';
+import { LearningHealth } from '../components/LearningHealth';
 import { allBadges } from '../lib/badges';
+import { readMotivation } from '../lib/motivation';
 import { useApp } from '../state/AppContext';
 import { streak } from '../state/model';
 import type { ExamRecord } from '../state/model';
@@ -50,6 +52,7 @@ export function ProgressPage() {
     now,
     speechOn,
   })
+    .filter((b) => b.kind === 'badge')
     .map((b) => ({ ...b, earned: b.earned || data.badges.includes(b.id) }))
     .sort((a, b) => Number(b.earned) - Number(a.earned));
 
@@ -67,6 +70,14 @@ export function ProgressPage() {
           <span className="muted">Изучено {trip.practiced} из {trip.phrases} фраз</span>
         </div>
       </section>
+
+      <LearningHealth
+        reading={readMotivation(data.answers, data.sessions, data.activeDays, now)}
+        answers={data.answers}
+        sessions={data.sessions}
+        activeDays={data.activeDays}
+        now={now}
+      />
 
       <section className="card stack">
         <div className="row row--between">
@@ -161,6 +172,13 @@ export function ProgressPage() {
             <b>Произношение.</b> Вы говорите фразу, система распознавания речи (как в Siri или Google) записывает, что
             услышала, и мы сравниваем это с нужной фразой по словам. Если распознаватель понял вас — поймёт и живой человек.
             Учитываются три последние попытки по каждой фразе, которую нужно говорить вам.
+          </p>
+          <p>
+            <b>Как приложение подстраивается под вас.</b> Задания подбираются так, чтобы верными было около 85% ответов:
+            при ошибках становится легче, когда всё слишком легко — сложнее. Ошибочная фраза возвращается через пару
+            заданий, а тренировка всегда заканчивается успехом. План на день считается от даты вылета; если занятий
+            становится меньше, план сжимается до одной минуты — маленький шаг лучше, чем никакого. Вместо серии дней
+            подряд — цель недели: пропуск дня ничего не обнуляет.
           </p>
           <p>
             <b>Проверка готовности</b> — это экзамен без подсказок: узнавание, понимание на слух, сборка фраз, чтение вслух и

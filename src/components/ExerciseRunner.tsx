@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Phrase } from '../data/types';
+import { isSuccess, type ExerciseSource } from '../lib/adaptive';
 import { exerciseChecks, isBuildCorrect, RECALL_PASS_SCORE, type Exercise } from '../lib/exercises';
+import type { SessionKind } from '../state/model';
 import type { PronunciationResult } from '../lib/pronunciation';
 import { useApp } from '../state/AppContext';
 import { hapticError, hapticSuccess } from '../lib/haptics';
@@ -18,7 +20,8 @@ export interface Outcome {
 }
 
 interface Props {
-  exercises: Exercise[];
+  source: ExerciseSource;
+  kind: SessionKind;
   mode: 'practice' | 'exam';
   onFinish: (outcomes: Outcome[]) => void;
   onExit: () => void;
@@ -32,13 +35,28 @@ const KIND_LABEL: Record<Exercise['type'], string> = {
   'recall-speak': 'Скажите по-английски',
 };
 
-export function ExerciseRunner({ exercises, mode, onFinish, onExit }: Props) {
+export function ExerciseRunner({ source, kind, mode, onFinish, onExit }: Props) {
   const app = useApp();
-  const [index, setIndex] = useState(0);
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [current, setCurrent] = useState<Outcome | null>(null);
+  // Следующее задание выбирается по результатам предыдущих (адаптивная сложность).
+  const [exercise, setExercise] = useState<Exercise | null>(() => source.next([]));
+  const startedAt = useRef(Date.now());
+  const index = outcomes.length;
+  const planned = Math.max(source.planned, index + 1);
 
-  const exercise = exercises[index];
+  const logSession = (all: Outcome[], exitedEarly: boolean) => {
+    if (!all.length && exitedEarly && Date.now() - startedAt.current < 3000) return; // случайно открыл и закрыл
+    app.logSession({
+      start: startedAt.current,
+      end: Date.now(),
+      kind,
+      planned: source.planned,
+      done: all.length,
+      correct: all.filter(isSuccess).length,
+      exitedEarly,
+    });
+  };
 
   const record = (o: Outcome) => {
     const checks = exerciseChecks(o.exercise.type);
@@ -57,8 +75,16 @@ export function ExerciseRunner({ exercises, mode, onFinish, onExit }: Props) {
     const all = [...outcomes, current];
     setOutcomes(all);
     setCurrent(null);
-    if (index + 1 >= exercises.length) onFinish(all);
-    else setIndex(index + 1);
+    const upcoming = source.next(all);
+    if (!upcoming) {
+      logSession(all, false);
+      onFinish(all);
+    } else setExercise(upcoming);
+  };
+
+  const exit = () => {
+    logSession(outcomes, true);
+    onExit();
   };
 
   if (!exercise) return null;
@@ -66,16 +92,16 @@ export function ExerciseRunner({ exercises, mode, onFinish, onExit }: Props) {
   return (
     <div className="page page--bare" style={{ minHeight: '100dvh' }}>
       <div className="row">
-        <button type="button" className="icon-btn icon-btn--plain" onClick={onExit} aria-label="Выйти">
+        <button type="button" className="icon-btn icon-btn--plain" onClick={exit} aria-label="Выйти">
           <IconClose />
         </button>
-        <div className="progress-dots grow" aria-label={`Задание ${index + 1} из ${exercises.length}`}>
-          {exercises.map((e, i) => (
-            <span key={e.key} className={i < index ? 'done' : i === index ? 'current' : ''} />
+        <div className="progress-dots grow" aria-label={`Задание ${index + 1} из ${planned}`}>
+          {Array.from({ length: planned }, (_, i) => (
+            <span key={i} className={i < index ? 'done' : i === index ? 'current' : ''} />
           ))}
         </div>
         <span className="small muted" style={{ minWidth: 44, textAlign: 'right' }}>
-          {index + 1}/{exercises.length}
+          {index + 1}/{planned}
         </span>
       </div>
 
@@ -97,7 +123,7 @@ export function ExerciseRunner({ exercises, mode, onFinish, onExit }: Props) {
 
       <div className="sticky-footer">
         <button type="button" className="btn btn--block" disabled={!current} onClick={next}>
-          {index + 1 >= exercises.length ? 'Посмотреть результат' : 'Дальше'}
+          {index + 1 >= planned && (!current || isSuccess(current)) ? 'Посмотреть результат' : 'Дальше'}
         </button>
       </div>
     </div>

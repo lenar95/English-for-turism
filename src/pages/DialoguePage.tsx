@@ -78,6 +78,8 @@ function DialogueRun({
   const [step, setStep] = useState(0);
   const [results, setResults] = useState<LineResult[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
+  const startedAt = useRef(Date.now());
+  const logged = useRef(false);
   const current = lines[step];
   const finished = step >= lines.length;
 
@@ -85,13 +87,36 @@ function DialogueRun({
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [step]);
 
+  const logDialogue = (all: LineResult[], exitedEarly: boolean) => {
+    if (logged.current) return;
+    const mine = all.filter((x) => x.phrase.speaker === 'you');
+    if (exitedEarly && !mine.length) return;
+    logged.current = true;
+    app.logSession({
+      start: startedAt.current,
+      end: Date.now(),
+      kind: 'dialogue',
+      planned: lines.filter((l) => l.speaker === 'you').length,
+      done: mine.length,
+      correct: mine.filter((x) => x.recalled).length,
+      exitedEarly,
+    });
+  };
+
+  // Ушёл со страницы посреди диалога — это досрочный выход.
+  const resultsRef = useRef<LineResult[]>([]);
+  useEffect(() => () => logDialogue(resultsRef.current, true), []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const complete = (r: LineResult) => {
     if (r.phrase.speaker === 'you') {
       if (r.recalled !== undefined) app.answer(r.phrase.id, r.recalled, 'recall');
       if (r.pronScore !== undefined) app.pronunciation(r.phrase.id, r.pronScore);
     }
-    setResults((prev) => [...prev, r]);
+    const all = [...results, r];
+    resultsRef.current = all;
+    setResults(all);
     setStep((s) => s + 1);
+    if (step + 1 >= lines.length) logDialogue(all, false);
   };
 
   const yourLines = results.filter((r) => r.phrase.speaker === 'you');

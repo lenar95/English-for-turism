@@ -21,7 +21,7 @@ function Switch({ checked, onChange, label, hint }: { checked: boolean; onChange
 }
 
 export function SettingsPage() {
-  const { data, updateSettings, resetProgress, speechSupported } = useApp();
+  const { data, updateSettings, resetProgress, speechSupported, setWeeklyGoal } = useApp();
   const [confirmReset, setConfirmReset] = useState(false);
   const s = data.settings;
 
@@ -34,6 +34,20 @@ export function SettingsPage() {
       <section className="card stack">
         <h3>Поездка</h3>
         <TripDetails />
+      </section>
+
+      <section className="card stack">
+        <h3>Цель недели</h3>
+        <p className="small muted">
+          Сколько дней в неделю заниматься. Пропустить день не страшно — важно набрать цель за неделю.
+        </p>
+        <div className="segmented">
+          {[3, 4, 5, 7].map((d) => (
+            <button key={d} type="button" className={data.weeklyGoal === d ? 'active' : ''} onClick={() => setWeeklyGoal(d)}>
+              {d} дн.
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="card stack">

@@ -5,7 +5,7 @@ import { allBadges, type Badge } from '../lib/badges';
 import { hapticSuccess } from '../lib/haptics';
 import type { AnswerKind } from '../lib/memory';
 import { recognitionAvailable, recognitionLikelyAvailable } from '../lib/speech/recognition';
-import { defaultData, reducer, streak, type AppData, type ExamRecord, type Settings, type Trip } from './model';
+import { defaultData, reducer, streak, type AppData, type ExamRecord, type SessionLog, type Settings, type Trip } from './model';
 import { loadData, saveData } from './storage';
 
 interface AppContextValue {
@@ -19,6 +19,8 @@ interface AppContextValue {
   answer(phraseId: string, correct: boolean, kind: AnswerKind): void;
   pronunciation(phraseId: string, score: number): void;
   saveExam(record: ExamRecord): void;
+  logSession(log: SessionLog): void;
+  setWeeklyGoal(days: number): void;
   updateTrip(trip: Partial<Trip>): void;
   updateSettings(settings: Partial<Settings>): void;
   finishOnboarding(): void;
@@ -58,6 +60,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'pronunciation', phraseId, score, now: Date.now() });
   }, []);
   const saveExam = useCallback((record: ExamRecord) => dispatch({ type: 'exam', record }), []);
+  const logSession = useCallback((log: SessionLog) => dispatch({ type: 'session', log }), []);
+  const setWeeklyGoal = useCallback((days: number) => dispatch({ type: 'weeklyGoal', days }), []);
   const updateTrip = useCallback((trip: Partial<Trip>) => dispatch({ type: 'trip', trip }), []);
   const updateSettings = useCallback((settings: Partial<Settings>) => dispatch({ type: 'settings', settings }), []);
   const finishOnboarding = useCallback(() => dispatch({ type: 'onboarded' }), []);
@@ -108,6 +112,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     answer,
     pronunciation,
     saveExam,
+    logSession,
+    setWeeklyGoal,
     updateTrip,
     updateSettings,
     finishOnboarding,
