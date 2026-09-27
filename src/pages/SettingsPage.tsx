@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { PronunciationCheck } from '../components/PronunciationCheck';
 import { SpeakButtons } from '../components/Speak';
+import { SpeechDiagnostics } from '../components/SpeechDiagnostics';
 import { TripDetails, TripScenarioPicker } from '../components/TripEditor';
 import { useApp } from '../state/AppContext';
 
@@ -77,6 +78,8 @@ export function SettingsPage() {
           <PronunciationCheck targets={['Hello, how are you?']} />
         </section>
       )}
+
+      {speechSupported && <SpeechDiagnostics />}
 
       <section className="card stack">
         <h3>Ситуации в поездке</h3>

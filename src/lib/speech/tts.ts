@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { TextToSpeech } from '@capacitor-community/text-to-speech';
+import { diag } from './diag';
 
 export type Accent = 'en-US' | 'en-GB';
 
@@ -70,6 +71,7 @@ export async function speak(text: string, { accent, slow, lang }: SpeakOptions):
   const synth = window.speechSynthesis;
   synth.cancel();
   lastAudioAt = Date.now();
+  diag(`озвучка: «${clean.slice(0, 40)}»`);
   await new Promise<void>((resolve) => {
     const u = new SpeechSynthesisUtterance(clean);
     u.lang = language;

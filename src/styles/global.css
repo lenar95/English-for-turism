@@ -1862,3 +1862,15 @@ details[open] summary .chev {
 .badge--locked {
   color: var(--text-3);
 }
+
+.diag-log {
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
