@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { PronunciationCheck } from '../components/PronunciationCheck';
+import { Reminders } from '../components/Reminders';
 import { SpeakButtons } from '../components/Speak';
 import { SpeechDiagnostics } from '../components/SpeechDiagnostics';
 import { TripDetails, TripScenarioPicker } from '../components/TripEditor';
@@ -35,6 +36,8 @@ export function SettingsPage() {
         <h3>Поездка</h3>
         <TripDetails />
       </section>
+
+      <Reminders />
 
       <section className="card stack">
         <h3>Цель недели</h3>

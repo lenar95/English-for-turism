@@ -26,6 +26,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - run: npm run build:server
       - name: Push dist to web-build branch
         run: |
           cd dist

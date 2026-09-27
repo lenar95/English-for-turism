@@ -4,6 +4,8 @@ import type { Scenario } from '../data/types';
 import { allBadges, type Badge } from '../lib/badges';
 import { hapticSuccess } from '../lib/haptics';
 import type { AnswerKind } from '../lib/memory';
+import { dailyPlan, readMotivation } from '../lib/motivation';
+import { newIdentity, registerServiceWorker, sendStatus, type PushIdentity, type PushSnapshot } from '../lib/push';
 import { recognitionAvailable, recognitionLikelyAvailable } from '../lib/speech/recognition';
 import { defaultData, reducer, streak, type AppData, type ExamRecord, type SessionLog, type Settings, type Trip } from './model';
 import { loadData, saveData } from './storage';
@@ -28,6 +30,10 @@ interface AppContextValue {
   /** Только что полученные значки — показываются всплывающим уведомлением. */
   toasts: Badge[];
   dismissToast(id: string): void;
+  /** Анонимный id для напоминаний (создаётся при первом включении). */
+  ensurePushId(): PushIdentity;
+  /** Сводка для сервера напоминаний: без личных данных, только цифры плана. */
+  pushSnapshot(): PushSnapshot;
 }
 
 const Ctx = createContext<AppContextValue | null>(null);
@@ -103,6 +109,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [ready, data.progress, data.exams, data.activeDays, data.badges, tripScenarios, speechOn]);
   const dismissToast = useCallback((id: string) => setToasts((t) => t.filter((b) => b.id !== id)), []);
 
+  useEffect(() => {
+    void registerServiceWorker();
+  }, []);
+
+  const pushSnapshot = useCallback((): PushSnapshot => {
+    const now = Date.now();
+    const reading = readMotivation(data.answers, data.sessions, data.activeDays, now);
+    const plan = dailyPlan(tripScenarios, data.progress, data.answers, data.trip.date, reading, now);
+    const days = [...data.activeDays].sort();
+    return {
+      lastActiveDay: days[days.length - 1] ?? null,
+      doneToday: plan.done,
+      goal: plan.goal,
+      tripDate: data.trip.date,
+      minimal: plan.minimal,
+    };
+  }, [data, tripScenarios]);
+
+  const ensurePushId = useCallback((): PushIdentity => {
+    if (data.pushId) return data.pushId;
+    const identity = newIdentity();
+    dispatch({ type: 'pushId', pushId: identity });
+    return identity;
+  }, [data.pushId]);
+
+  // После занятий сообщаем серверу, чтобы он не напоминал зря (с задержкой, пачкой).
+  const statusKey = `${data.activeDays[data.activeDays.length - 1] ?? ''}|${data.answers.length}|${data.trip.date}|${data.settings.reminderTime}`;
+  useEffect(() => {
+    if (!ready || !data.settings.reminders || !data.pushId) return;
+    const t = setTimeout(() => void sendStatus(data.pushId!, data.settings.reminderTime, pushSnapshot()), 3000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, statusKey, data.settings.reminders]);
+
   const value: AppContextValue = {
     data,
     ready,
@@ -120,6 +160,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     resetProgress,
     toasts,
     dismissToast,
+    ensurePushId,
+    pushSnapshot,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

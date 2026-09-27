@@ -130,6 +130,16 @@ curl -fsSL https://raw.githubusercontent.com/lenar95/English-for-turism/claude/r
 Скрипт ставит Caddy с автоматическим HTTPS от Let's Encrypt (без HTTPS браузер не даст доступ к микрофону)
 и таймер автообновления. Логи: `journalctl -u caddy -f`, обновления: `journalctl -u english-for-tourism-update`.
 
+### Сервис напоминаний
+
+`server/` — небольшой сервис на Node.js без зависимостей во время выполнения: esbuild собирает его в один файл
+`dist/.server/server.cjs`, который публикуется вместе с сайтом. Он хранит push-подписки браузеров (анонимный id,
+подписка и цифры плана — без личных данных) и раз в минуту решает, кому пора напомнить (`server/src/schedule.ts`):
+не напоминает, если сегодня уже занимались; после перерыва — реже; после 14 дней тишины — перестаёт.
+`deploy/install.sh` ставит его как systemd-службу, Caddy проксирует на него `/api/*`.
+
+Локально: `npm run build && npm run build:server && npm run server` (порт 8787, `vite` проксирует `/api`).
+
 ### iOS-приложение
 
 Нужен Mac с Xcode 16 или новее. Зависимости iOS подключаются через Swift Package Manager, CocoaPods не нужен.

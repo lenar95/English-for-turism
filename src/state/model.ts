@@ -8,6 +8,10 @@ export interface Settings {
   showTranscription: boolean;
   /** Учитывать произношение (нужен микрофон). Без него готовность считается только по памяти. */
   pronunciation: boolean;
+  /** Напоминания включены. */
+  reminders: boolean;
+  /** Время напоминания HH:MM. */
+  reminderTime: string;
 }
 
 export interface Trip {
@@ -67,6 +71,8 @@ export interface AppData {
   sessions: SessionLog[];
   /** Сколько дней в неделю заниматься (цель недели). */
   weeklyGoal: number;
+  /** Анонимный идентификатор для напоминаний (без личных данных). */
+  pushId: { id: string; token: string } | null;
 }
 
 export const defaultData = (): AppData => ({
@@ -75,12 +81,13 @@ export const defaultData = (): AppData => ({
   progress: {},
   exams: [],
   trip: { destination: '', date: '', scenarioIds: [], cityId: '' },
-  settings: { accent: 'en-US', showTranscription: true, pronunciation: true },
+  settings: { accent: 'en-US', showTranscription: true, pronunciation: true, reminders: false, reminderTime: '19:00' },
   activeDays: [],
   badges: [],
   answers: [],
   sessions: [],
   weeklyGoal: 4,
+  pushId: null,
 });
 
 /**
@@ -118,6 +125,7 @@ export type Action =
   | { type: 'badges'; ids: string[] }
   | { type: 'session'; log: SessionLog }
   | { type: 'weeklyGoal'; days: number }
+  | { type: 'pushId'; pushId: { id: string; token: string } }
   | { type: 'reset' };
 
 export function reducer(data: AppData, action: Action): AppData {
@@ -156,12 +164,14 @@ export function reducer(data: AppData, action: Action): AppData {
       return { ...data, onboarded: true };
     case 'session':
       return { ...data, sessions: [...data.sessions, action.log].slice(-100) };
+    case 'pushId':
+      return { ...data, pushId: action.pushId };
     case 'weeklyGoal':
       return { ...data, weeklyGoal: Math.max(1, Math.min(7, action.days)) };
     case 'badges':
       return { ...data, badges: [...data.badges, ...action.ids.filter((id) => !data.badges.includes(id))] };
     case 'reset':
-      return { ...defaultData(), onboarded: true, settings: data.settings };
+      return { ...defaultData(), onboarded: true, settings: data.settings, pushId: data.pushId };
   }
 }
 
@@ -197,5 +207,6 @@ export function migrate(raw: unknown): AppData {
     answers: r.answers ?? [],
     sessions: r.sessions ?? [],
     weeklyGoal: r.weeklyGoal ?? 4,
+    pushId: r.pushId ?? null,
   };
 }

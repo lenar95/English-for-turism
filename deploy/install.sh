@@ -11,6 +11,7 @@
 #   1. Ставит Caddy (веб-сервер с автоматическим HTTPS от Let's Encrypt) и git.
 #   2. Скачивает готовую сборку сайта из ветки web-build репозитория.
 #   3. Включает таймер, который раз в 2 минуты подтягивает свежую сборку.
+#   4. Запускает сервис напоминаний (Node.js) — он получает запросы /api/* через Caddy.
 # HTTPS обязателен: без него браузеры не дают доступ к микрофону.
 set -euo pipefail
 
@@ -19,6 +20,8 @@ EMAIL="${2:-${EMAIL:-}}"
 REPO="${REPO:-https://github.com/lenar95/English-for-turism.git}"
 BRANCH="${BRANCH:-web-build}"
 WEB_DIR=/var/www/english-for-tourism
+DATA_DIR=/var/lib/english-for-tourism
+PUSH_PORT=8787
 
 if [[ $EUID -ne 0 ]]; then echo "Запустите под root (sudo)." >&2; exit 1; fi
 if [[ -z "$DOMAIN" ]]; then echo "Укажите домен: bash install.sh example.com you@example.com" >&2; exit 1; fi
@@ -27,7 +30,7 @@ if [[ -z "$EMAIL" ]]; then echo "Предупреждение: email не ука
 echo "==> Устанавливаю пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
-apt-get install -y -q caddy git ca-certificates
+apt-get install -y -q caddy git ca-certificates nodejs
 
 echo "==> Скачиваю сборку сайта"
 if [[ -d "$WEB_DIR/.git" ]]; then
@@ -45,9 +48,14 @@ set -e
 cd "$WEB_DIR"
 git fetch -q --depth 1 origin "$BRANCH"
 if [[ "\$(git rev-parse HEAD)" != "\$(git rev-parse "origin/$BRANCH")" ]]; then
+  before=\$(sha256sum .server/server.cjs 2>/dev/null || true)
   git reset -q --hard "origin/$BRANCH"
   git reflog expire --expire=now --all && git gc -q --prune=now
   echo "Сайт обновлён до \$(git rev-parse --short HEAD)"
+  after=\$(sha256sum .server/server.cjs 2>/dev/null || true)
+  if [[ "\$before" != "\$after" ]]; then
+    systemctl restart english-for-tourism-push.service && echo "Сервис напоминаний перезапущен"
+  fi
 fi
 UPD
 chmod +x /usr/local/bin/english-for-tourism-update
@@ -77,6 +85,44 @@ UNIT
 systemctl daemon-reload
 systemctl enable --now english-for-tourism-update.timer
 
+echo "==> Настраиваю сервис напоминаний"
+id -u eft-push >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin eft-push
+mkdir -p "$DATA_DIR"
+chown eft-push:eft-push "$DATA_DIR"
+chmod 700 "$DATA_DIR"
+cat > /etc/systemd/system/english-for-tourism-push.service <<UNIT
+[Unit]
+Description=Сервис напоминаний «Английский в поездку»
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=eft-push
+Environment=PORT=$PUSH_PORT
+Environment=DATA_DIR=$DATA_DIR
+Environment=VAPID_SUBJECT=https://$DOMAIN
+ExecStart=/usr/bin/node $WEB_DIR/.server/server.cjs
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=$DATA_DIR
+MemoryMax=200M
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+if [[ -f "$WEB_DIR/.server/server.cjs" ]]; then
+  systemctl enable english-for-tourism-push.service
+  systemctl restart english-for-tourism-push.service
+else
+  systemctl enable english-for-tourism-push.service
+  echo "Сборка сервиса напоминаний ещё не опубликована — он запустится после следующего обновления."
+fi
+
 echo "==> Настраиваю Caddy для $DOMAIN"
 GLOBAL=""
 if [[ -n "$EMAIL" ]]; then GLOBAL=$'{\n\temail '"$EMAIL"$'\n}\n'; fi
@@ -86,13 +132,17 @@ $DOMAIN {
 	root * $WEB_DIR
 	encode zstd gzip
 
-	@hidden path /.git /.git/*
+	@hidden path /.git /.git/* /.server /.server/*
 	respond @hidden 404
+
+	# Сервис напоминаний.
+	reverse_proxy /api/* 127.0.0.1:$PUSH_PORT
 
 	@html path / /index.html
 	header @html Cache-Control "no-cache"
 	header /assets/* Cache-Control "public, max-age=31536000, immutable"
 	header /manifest.webmanifest Content-Type "application/manifest+json"
+	header /sw.js Cache-Control "no-cache"
 	header {
 		Permissions-Policy "microphone=(self)"
 		X-Content-Type-Options "nosniff"

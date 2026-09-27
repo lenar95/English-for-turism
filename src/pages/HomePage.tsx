@@ -6,6 +6,7 @@ import { TodayPlan, WeekDots } from '../components/TodayPlan';
 import { stageStyle } from '../components/stage';
 import { cities, cityById } from '../data';
 import { activeThisWeek, dailyPlan, readMotivation, rememberedShare } from '../lib/motivation';
+import { pushSupport } from '../lib/push';
 import { scenarioReadiness, tripReadiness } from '../lib/readiness';
 import { useApp } from '../state/AppContext';
 
@@ -59,6 +60,21 @@ export function HomePage() {
 
       <TodayPlan plan={plan} reading={reading} remembered={rememberedShare(tripScenarios, data.progress, now)} />
 
+
+      {data.answers.length > 0 && !data.settings.reminders && ['ok', 'ios-install'].includes(pushSupport()) && (
+        <Link to="/settings" className="banner" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <span aria-hidden style={{ fontSize: 22 }}>⏰</span>
+          <span className="grow">
+            <b>Когда вам удобно заниматься?</b>
+            <br />
+            <span className="small">
+              {pushSupport() === 'ios-install'
+                ? 'Добавьте приложение на экран «Домой» — и мы будем напоминать в удобное время.'
+                : 'Выберите время — напомним, только если в этот день вы ещё не занимались.'}
+            </span>
+          </span>
+        </Link>
+      )}
 
       {can.length > 0 && (
         <section className="card stack">

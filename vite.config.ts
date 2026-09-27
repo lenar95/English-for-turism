@@ -10,5 +10,8 @@ export default defineConfig({
   base: './',
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   build: { target: 'es2020' },
+  // Локально /api проксируется на сервис напоминаний (npm run server).
+  server: { proxy: { '/api': 'http://127.0.0.1:8787' } },
+  preview: { proxy: { '/api': 'http://127.0.0.1:8787' } },
   test: { environment: 'node' },
 });
