@@ -3,7 +3,9 @@ import type { Phrase } from '../data/types';
 import { exerciseChecks, isBuildCorrect, RECALL_PASS_SCORE, type Exercise } from '../lib/exercises';
 import type { PronunciationResult } from '../lib/pronunciation';
 import { useApp } from '../state/AppContext';
-import { IconClose } from './Icons';
+import { hapticError, hapticSuccess } from '../lib/haptics';
+import { Burst } from './Burst';
+import { IconCheck, IconClose } from './Icons';
 import { PronunciationCheck } from './PronunciationCheck';
 import { SpeakButtons } from './Speak';
 
@@ -81,7 +83,14 @@ export function ExerciseRunner({ exercises, mode, onFinish, onExit }: Props) {
         key={exercise.key}
         exercise={exercise}
         mode={mode}
-        onAnswered={setCurrent}
+        onAnswered={(o) => {
+          // Вибрация на выбор ответа; у речевых заданий она срабатывает в самой проверке произношения.
+          if (o && o.memoryCorrect !== undefined && o.pronScore === undefined) {
+            if (o.memoryCorrect) hapticSuccess();
+            else hapticError();
+          }
+          setCurrent(o);
+        }}
         speechOn={app.speechOn}
         showTr={app.data.settings.showTranscription}
       />
@@ -122,8 +131,16 @@ function ExerciseView(props: ViewProps) {
 
 function Answer({ phrase, showTr, title, tone }: { phrase: Phrase; showTr: boolean; title: string; tone: 'good' | 'bad' | 'mid' }) {
   return (
-    <div className={`feedback feedback--${tone}`} aria-live="polite">
-      <span className="feedback__title">{title}</span>
+    <div className={`feedback feedback--${tone} pop`} aria-live="polite">
+      {tone === 'good' && <Burst />}
+      <span className="feedback__title">
+        {tone === 'good' && (
+          <span className="check-badge">
+            <IconCheck width={16} height={16} />
+          </span>
+        )}
+        {title}
+      </span>
       <div className="row">
         <div className="grow stack stack--sm">
           <span className="phrase__en" lang="en">{phrase.en}</span>

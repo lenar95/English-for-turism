@@ -39,6 +39,8 @@ export interface AppData {
   settings: Settings;
   /** Дни занятий (YYYY-MM-DD) — для серии дней подряд. */
   activeDays: string[];
+  /** Полученные значки (id). Однажды полученный значок не отнимается. */
+  badges: string[];
 }
 
 export const defaultData = (): AppData => ({
@@ -49,6 +51,7 @@ export const defaultData = (): AppData => ({
   trip: { destination: '', date: '', scenarioIds: [], cityId: '' },
   settings: { accent: 'en-US', showTranscription: true, pronunciation: true },
   activeDays: [],
+  badges: [],
 });
 
 export function dayKey(ts: number): string {
@@ -71,6 +74,7 @@ export type Action =
   | { type: 'trip'; trip: Partial<Trip> }
   | { type: 'settings'; settings: Partial<Settings> }
   | { type: 'onboarded' }
+  | { type: 'badges'; ids: string[] }
   | { type: 'reset' };
 
 export function reducer(data: AppData, action: Action): AppData {
@@ -105,6 +109,8 @@ export function reducer(data: AppData, action: Action): AppData {
       return { ...data, settings: { ...data.settings, ...action.settings } };
     case 'onboarded':
       return { ...data, onboarded: true };
+    case 'badges':
+      return { ...data, badges: [...data.badges, ...action.ids.filter((id) => !data.badges.includes(id))] };
     case 'reset':
       return { ...defaultData(), onboarded: true, settings: data.settings };
   }
@@ -138,5 +144,6 @@ export function migrate(raw: unknown): AppData {
     progress: r.progress ?? {},
     exams: r.exams ?? [],
     activeDays: r.activeDays ?? [],
+    badges: r.badges ?? [],
   };
 }

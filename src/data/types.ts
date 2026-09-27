@@ -65,6 +65,8 @@ export interface LocalWord {
 export interface CityPack {
   id: string;
   name: string;
+  /** Код аэропорта для посадочного талона, например IST. */
+  code: string;
   country: string;
   emoji: string;
   /** Коротко: чем город отличается и к чему готовиться. */

@@ -12,3 +12,4 @@ ios/App/build/
 ios/App/DerivedData/
 xcuserdata/
 *.xcuserstate
+design-preview/

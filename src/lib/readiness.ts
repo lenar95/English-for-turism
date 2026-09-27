@@ -82,7 +82,7 @@ export function tripReadiness(
 export interface ReadinessLevel {
   label: string;
   description: string;
-  tone: 'bad' | 'mid' | 'good' | 'great';
+  tone: 'mid' | 'good' | 'great';
 }
 
 export function readinessLevel(total: number): ReadinessLevel {
@@ -107,6 +107,6 @@ export function readinessLevel(total: number): ReadinessLevel {
   return {
     label: 'Пока не готов',
     description: 'Начните с ключевых фраз — их немного, а пользы больше всего.',
-    tone: 'bad',
+    tone: 'mid',
   };
 }

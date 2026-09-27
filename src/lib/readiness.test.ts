@@ -65,7 +65,7 @@ describe('готовность', () => {
   });
 
   it('уровни готовности', () => {
-    expect(readinessLevel(10).tone).toBe('bad');
+    expect(readinessLevel(10).tone).toBe('mid');
     expect(readinessLevel(45).tone).toBe('mid');
     expect(readinessLevel(70).tone).toBe('good');
     expect(readinessLevel(90).tone).toBe('great');

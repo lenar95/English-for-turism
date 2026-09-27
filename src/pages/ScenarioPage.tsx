@@ -4,6 +4,7 @@ import { IconBrain, IconChat, IconChevron, IconPlay, IconTarget, IconWave } from
 import { TopBar } from '../components/Layout';
 import { PhraseCard } from '../components/PhraseCard';
 import { Metric, Ring } from '../components/Readiness';
+import { stageStyle } from '../components/stage';
 import { scenarioById } from '../data';
 import { scenarioReadiness } from '../lib/readiness';
 import { useApp } from '../state/AppContext';
@@ -29,16 +30,16 @@ export function ScenarioPage() {
   return (
     <div className="page">
       <TopBar back={scenario.cityId ? `/city/${scenario.cityId}` : '/scenarios'} title={scenario.title} />
-      <header className="row">
-        <span className="big-emoji" aria-hidden>{scenario.emoji}</span>
-        <div className="grow stack stack--sm">
-          <h1>{scenario.title}</h1>
-          <p className="muted small">{scenario.goal}</p>
+      <section className="scenario-hero" style={stageStyle(scenario.stage)}>
+        <div className="row">
+          <span className="scenario-hero__emoji" aria-hidden>{scenario.emoji}</span>
+          <div className="grow stack stack--sm">
+            <h1>{scenario.title}</h1>
+            <p className="scenario-hero__goal">{scenario.goal}</p>
+          </div>
         </div>
-      </header>
-
-      <section className="card row" style={{ alignItems: 'center' }}>
-        <Ring value={r.total} size={96} stroke={10} />
+        <div className="row" style={{ alignItems: 'center' }}>
+        <Ring value={r.total} size={88} stroke={9} />
         <div className="grow stack">
           <Metric icon={<IconBrain width={16} height={16} />} label="Память" value={r.memory} />
           <Metric
@@ -47,6 +48,7 @@ export function ScenarioPage() {
             value={r.pronunciation}
             disabled={speechOn ? undefined : 'Нужен микрофон'}
           />
+        </div>
         </div>
       </section>
 

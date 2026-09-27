@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { Burst } from '../components/Burst';
 import { IconBrain, IconWave } from '../components/Icons';
 import { TopBar } from '../components/Layout';
 import { PronunciationCheck } from '../components/PronunciationCheck';
@@ -122,7 +123,8 @@ function DialogueRun({
       </div>
 
       {finished && (
-        <div className="card stack" style={{ alignItems: 'center' }}>
+        <div className="card stack pop" style={{ alignItems: 'center', position: 'relative' }}>
+          <Burst count={20} />
           <h2>Диалог пройден! 🎉</h2>
           <Ring value={pron === null ? memory : Math.round((memory + pron) / 2)} size={120} label="результат" />
           <div className="stack" style={{ width: '100%' }}>

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { TabBar } from './components/Layout';
+import { Toasts } from './components/Toasts';
 import { CityPage } from './pages/CityPage';
 import { DialoguePage } from './pages/DialoguePage';
 import { HomePage } from './pages/HomePage';
@@ -43,6 +44,7 @@ function Shell() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {!focused && <TabBar />}
+      <Toasts />
     </>
   );
 }

@@ -650,6 +650,7 @@ const mosques: Scenario = {
 export const istanbul: CityPack = {
   id: 'istanbul',
   name: 'Стамбул',
+  code: 'IST',
   country: 'Турция',
   emoji: '🇹🇷',
   intro:

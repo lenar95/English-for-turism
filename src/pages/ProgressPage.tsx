@@ -2,7 +2,9 @@ import { Link } from 'react-router-dom';
 import { Ring } from '../components/Readiness';
 import { scenarioById } from '../data';
 import { scenarioReadiness, tripReadiness, MEMORY_WEIGHT } from '../lib/readiness';
+import { allBadges } from '../lib/badges';
 import { useApp } from '../state/AppContext';
+import { streak } from '../state/model';
 import type { ExamRecord } from '../state/model';
 
 function ExamChart({ exams }: { exams: ExamRecord[] }) {
@@ -18,7 +20,7 @@ function ExamChart({ exams }: { exams: ExamRecord[] }) {
       ))}
       {list.map((e, i) => {
         const bh = Math.max(3, (e.total / 100) * (h - 4));
-        const color = e.total >= 60 ? 'var(--good)' : e.total >= 30 ? 'var(--mid)' : 'var(--bad)';
+        const color = e.total >= 60 ? 'var(--good)' : 'var(--mid)';
         return (
           <g key={e.at}>
             <rect x={pad + i * bw + bw * 0.18} y={h - bh + 2} width={bw * 0.64} height={bh} rx={4} fill={color}>
@@ -39,6 +41,17 @@ export function ProgressPage() {
   const now = Date.now();
   const trip = tripReadiness(tripScenarios, data.progress, now, speechOn);
   const exams = [...data.exams].reverse();
+  // Значок, однажды полученный, остаётся, даже если готовность потом снизилась.
+  const badges = allBadges({
+    progress: data.progress,
+    exams: data.exams,
+    streak: streak(data.activeDays, now),
+    tripScenarios,
+    now,
+    speechOn,
+  })
+    .map((b) => ({ ...b, earned: b.earned || data.badges.includes(b.id) }))
+    .sort((a, b) => Number(b.earned) - Number(a.earned));
 
   return (
     <div className="page">
@@ -52,6 +65,24 @@ export function ProgressPage() {
           <span>🧠 Память: <b>{trip.memory}%</b></span>
           <span>🎙 Произношение: <b>{speechOn ? `${trip.pronunciation}%` : '—'}</b></span>
           <span className="muted">Изучено {trip.practiced} из {trip.phrases} фраз</span>
+        </div>
+      </section>
+
+      <section className="card stack">
+        <div className="row row--between">
+          <h3>Значки</h3>
+          <span className="small muted">
+            {badges.filter((b) => b.earned).length} из {badges.length}
+          </span>
+        </div>
+        <div className="badges">
+          {badges.map((b) => (
+            <div key={b.id} className={`badge ${b.earned ? '' : 'badge--locked'}`} title={b.hint}>
+              <span className="badge__emoji" aria-hidden>{b.emoji}</span>
+              <span>{b.title}</span>
+              {!b.earned && <span className="tiny" style={{ fontWeight: 500 }}>{b.hint}</span>}
+            </div>
+          ))}
         </div>
       </section>
 

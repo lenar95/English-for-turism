@@ -3,7 +3,10 @@ import { pronunciationVerdict, scorePronunciation, type PronunciationResult } fr
 import { listen, recognitionErrorText, type ListenSession } from '../lib/speech/recognition';
 import { stopSpeaking } from '../lib/speech/tts';
 import { useApp } from '../state/AppContext';
+import { hapticError, hapticSuccess } from '../lib/haptics';
+import { Burst } from './Burst';
 import { IconMic, IconStop } from './Icons';
+import { VoiceBars } from './VoiceBars';
 
 interface Props {
   /** Допустимые варианты фразы; первый — основной. */
@@ -61,6 +64,8 @@ export function PronunciationCheck({ targets, onResult, showWords = true, compac
         const r = scorePronunciation(targets, alts);
         setResult(r);
         setStatus('done');
+        if (r.score >= 85) hapticSuccess();
+        else if (r.score < 40) hapticError();
         onResult?.(r);
       })
       .catch((err: unknown) => {
@@ -93,12 +98,14 @@ export function PronunciationCheck({ targets, onResult, showWords = true, compac
         >
           {status === 'listening' ? <IconStop /> : <IconMic />}
         </button>
+        {status === 'listening' && !compact && <VoiceBars pulse={partial} />}
         <p className={`pron__hint ${compact ? 'grow' : ''}`} style={compact ? { textAlign: 'left' } : undefined} aria-live="polite">
           {hint}
         </p>
       </div>
       {result && verdict && (
-        <div className="pron__result" aria-live="polite">
+        <div className="pron__result pop" aria-live="polite">
+          {result.score >= 85 && <Burst />}
           <div className={`pron__score tone-${verdict.tone}`}>
             <span className="pron__score-num">{result.score}%</span>
             <span>{verdict.label}</span>

@@ -1,13 +1,12 @@
 import type { ReactNode } from 'react';
 import { readinessLevel } from '../lib/readiness';
 
-export function toneOf(value: number): 'bad' | 'mid' | 'good' {
-  if (value >= 60) return 'good';
-  if (value >= 30) return 'mid';
-  return 'bad';
+/** Цвет прогресса: янтарный — в процессе, зелёный — готово. Красный оставляем для ошибок. */
+export function toneOf(value: number): 'mid' | 'good' {
+  return value >= 60 ? 'good' : 'mid';
 }
 
-const toneColor = (v: number) => `var(--${toneOf(v)})`;
+const toneColor = (v: number) => (v === 0 ? 'var(--neutral)' : `var(--${toneOf(v)})`);
 
 export function Ring({ value, size = 120, stroke = 12, label }: { value: number; size?: number; stroke?: number; label?: string }) {
   const r = (size - stroke) / 2;

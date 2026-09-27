@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { readinessLevel } from '../lib/readiness';
 import { useApp } from '../state/AppContext';
 import type { Outcome } from './ExerciseRunner';
+import { Burst } from './Burst';
 import { IconBrain, IconWave } from './Icons';
 import { Metric, Ring } from './Readiness';
 import { SpeakButtons } from './Speak';
@@ -42,7 +43,8 @@ export function SessionResult({ title, outcomes, score, onRetry, backTo, backLab
 
   return (
     <div className="page page--bare">
-      <div className="card stack" style={{ alignItems: 'center', textAlign: 'center' }}>
+      <div className="card stack pop" style={{ alignItems: 'center', textAlign: 'center', position: 'relative' }}>
+        {score.total >= 60 && <Burst count={20} />}
         <span className="small muted">{title}</span>
         <Ring value={score.total} size={150} label={exam ? 'результат' : 'за сессию'} />
         {exam && <span className={`level-badge tone-${level.tone}`}>{level.label}</span>}
