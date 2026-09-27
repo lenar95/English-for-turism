@@ -69,7 +69,12 @@ export function PronunciationCheck({ targets, onResult, showWords = true, compac
         onResult?.(r);
       })
       .catch((err: unknown) => {
-        if ((err as { code?: string })?.code === 'aborted') return;
+        if ((err as { code?: string })?.code === 'aborted') {
+          // Запись прервана (например, начали запись на другой фразе) — возвращаем кнопку в исходное состояние.
+          setStatus('idle');
+          setPartial('');
+          return;
+        }
         setError(recognitionErrorText(err));
         setStatus('error');
       });

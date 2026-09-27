@@ -1,5 +1,6 @@
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { SpeechRecognition as NativeRecognition } from '@capgo/capacitor-speech-recognition';
+import { msSinceSpeech } from './tts';
 
 /**
  * Распознавание английской речи.
@@ -51,6 +52,7 @@ interface WebRecognition {
   onresult: ((e: WebRecognitionEvent) => void) | null;
   onerror: ((e: { error: string }) => void) | null;
   onend: (() => void) | null;
+  onaudiostart?: (() => void) | null;
 }
 interface WebRecognitionEvent {
   results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }>;
@@ -86,7 +88,19 @@ export function listen(opts: ListenOptions = {}): ListenSession {
   return Capacitor.isNativePlatform() ? listenNative(opts) : listenWeb(opts);
 }
 
-function listenWeb({ lang = 'en-US', onPartial, maxMs = 12000 }: ListenOptions): ListenSession {
+/** Активная запись в браузере: одновременно может идти только одна. */
+let activeWeb: { abort(): void } | null = null;
+
+/**
+ * Распознавание в браузере со страховками от зависаний.
+ * Safari на iPhone иногда не присылает ни результата, ни события окончания,
+ * поэтому приложение не полагается на браузер и завершает запись само:
+ * - после паузы в речи (silenceMs) — останавливает запись;
+ * - если после остановки браузер не ответил (0,6–1,2 с) — забирает то, что успело распознаться;
+ * - если микрофон так и не заработал — тихо перезапускает распознавание (до 2 раз);
+ * - если за 8 с не распознано ни слова — сообщает «ничего не услышали», а не висит.
+ */
+function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 }: ListenOptions): ListenSession {
   const Ctor = webCtor();
   if (!Ctor) {
     return {
@@ -95,18 +109,77 @@ function listenWeb({ lang = 'en-US', onPartial, maxMs = 12000 }: ListenOptions):
       abort() {},
     };
   }
-  const rec = new Ctor();
-  rec.lang = lang;
-  rec.interimResults = true;
-  rec.maxAlternatives = 5;
-  rec.continuous = false;
+  // Предыдущая запись (например, на другой карточке) должна закончиться, иначе Safari зависает.
+  activeWeb?.abort();
 
+  let rec: WebRecognition | null = null;
   let alternatives: string[] = [];
-  let aborted = false;
   let error: RecognitionError | null = null;
+  let settled = false;
+  let aborted = false;
+  let audioStarted = false;
+  let restarts = 0;
+  const timers = new Set<ReturnType<typeof setTimeout>>();
+  const later = (fn: () => void, ms: number) => {
+    const t = setTimeout(() => {
+      timers.delete(t);
+      fn();
+    }, ms);
+    timers.add(t);
+    return t;
+  };
+  let silenceTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const result = new Promise<string[]>((resolve, reject) => {
-    rec.onresult = (e) => {
+  let resolveResult!: (v: string[]) => void;
+  let rejectResult!: (e: RecognitionError) => void;
+  const result = new Promise<string[]>((res, rej) => {
+    resolveResult = res;
+    rejectResult = rej;
+  });
+
+  const finish = () => {
+    if (settled) return;
+    settled = true;
+    timers.forEach(clearTimeout);
+    timers.clear();
+    const r = rec;
+    rec = null;
+    try {
+      r?.abort();
+    } catch {
+      /* уже остановлено */
+    }
+    if (activeWeb === session) activeWeb = null;
+    if (aborted) rejectResult(new RecognitionError('aborted'));
+    else if (alternatives.length) resolveResult(alternatives);
+    else rejectResult(error ?? new RecognitionError('no-speech'));
+  };
+
+  /** Мягкая остановка: просим браузер закончить, но ждём не дольше 1,2 с. */
+  const stop = () => {
+    if (settled) return;
+    try {
+      rec?.stop();
+    } catch {
+      /* ignore */
+    }
+    // Если фраза уже распознана, долго ждать браузер незачем.
+    later(finish, alternatives.length ? 600 : 1200);
+  };
+
+  const begin = () => {
+    const r = new Ctor();
+    rec = r;
+    r.lang = lang;
+    r.interimResults = true;
+    r.maxAlternatives = 5;
+    r.continuous = false;
+    r.onaudiostart = () => {
+      if (rec === r) audioStarted = true;
+    };
+    r.onresult = (e) => {
+      if (rec !== r) return;
+      audioStarted = true;
       // Склеиваем все сегменты: для каждой гипотезы берём её вариант в каждом сегменте.
       const segs = Array.from(e.results);
       const maxAlt = Math.max(...segs.map((s) => s.length));
@@ -116,8 +189,15 @@ function listenWeb({ lang = 'en-US', onPartial, maxMs = 12000 }: ListenOptions):
       }
       alternatives = alts.filter(Boolean);
       onPartial?.(alternatives[0] ?? '');
+      // Пауза после речи — фраза сказана, заканчиваем.
+      if (silenceTimer) {
+        clearTimeout(silenceTimer);
+        timers.delete(silenceTimer);
+      }
+      silenceTimer = later(stop, silenceMs);
     };
-    rec.onerror = (e) => {
+    r.onerror = (e) => {
+      if (rec !== r) return;
       const map: Record<string, RecognitionErrorCode> = {
         'not-allowed': 'permission',
         'service-not-allowed': 'permission',
@@ -126,28 +206,51 @@ function listenWeb({ lang = 'en-US', onPartial, maxMs = 12000 }: ListenOptions):
         aborted: 'aborted',
       };
       error = new RecognitionError(map[e.error] ?? 'unknown', e.error);
+      if (error.code === 'permission' || error.code === 'network') finish();
     };
-    rec.onend = () => {
-      clearTimeout(timer);
-      if (aborted) reject(new RecognitionError('aborted'));
-      else if (alternatives.length) resolve(alternatives);
-      else reject(error ?? new RecognitionError('no-speech'));
+    r.onend = () => {
+      if (rec === r) finish();
     };
-  });
-  const timer = setTimeout(() => rec.stop(), maxMs);
-  try {
-    rec.start();
-  } catch {
-    // start() бросает, если распознавание уже запущено — onend всё равно придёт.
-  }
-  return {
+    try {
+      r.start();
+    } catch {
+      // start() бросает, если браузер ещё не отпустил предыдущую запись. Сработает перезапуск ниже.
+    }
+    // Микрофон так и не включился и ничего не распознано — перезапускаем «с нуля».
+    later(() => {
+      if (settled || rec !== r || audioStarted || alternatives.length || restarts >= 2) return;
+      restarts++;
+      r.onend = null;
+      r.onresult = null;
+      r.onerror = null;
+      try {
+        r.abort();
+      } catch {
+        /* ignore */
+      }
+      later(begin, 250);
+    }, 2500);
+  };
+
+  const session = {
     result,
-    stop: () => rec.stop(),
+    stop,
     abort: () => {
       aborted = true;
-      rec.abort();
+      finish();
     },
   };
+  activeWeb = session;
+  // Если только что звучала озвучка, даём браузеру переключить аудио с динамика на микрофон.
+  const wait = Math.max(0, 400 - msSinceSpeech());
+  if (wait) later(begin, wait);
+  else begin();
+  // Ни одного слова за 8 с — не висим, а сообщаем, что ничего не услышали.
+  later(() => {
+    if (!alternatives.length) finish();
+  }, 8000);
+  later(stop, maxMs);
+  return session;
 }
 
 function listenNative({ lang = 'en-US', onPartial, silenceMs = 1600, maxMs = 12000 }: ListenOptions): ListenSession {

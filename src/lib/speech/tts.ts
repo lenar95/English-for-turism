@@ -21,6 +21,10 @@ const PREFERRED_VOICES = [
 
 let voicesCache: SpeechSynthesisVoice[] = [];
 
+/** Когда последний раз звучала или была прервана озвучка — чтобы микрофон не включался в ту же секунду. */
+let lastAudioAt = 0;
+export const msSinceSpeech = () => Date.now() - lastAudioAt;
+
 function loadVoices(): SpeechSynthesisVoice[] {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return [];
   const list = window.speechSynthesis.getVoices();
@@ -65,14 +69,21 @@ export async function speak(text: string, { accent, slow, lang }: SpeakOptions):
   if (!ttsAvailable()) return;
   const synth = window.speechSynthesis;
   synth.cancel();
+  lastAudioAt = Date.now();
   await new Promise<void>((resolve) => {
     const u = new SpeechSynthesisUtterance(clean);
     u.lang = language;
     u.rate = rate;
     const voice = pickVoice(language);
     if (voice) u.voice = voice;
-    u.onend = () => resolve();
-    u.onerror = () => resolve();
+    u.onend = () => {
+      lastAudioAt = Date.now();
+      resolve();
+    };
+    u.onerror = () => {
+      lastAudioAt = Date.now();
+      resolve();
+    };
     synth.speak(u);
     // Страховка: в некоторых браузерах onend не приходит.
     setTimeout(resolve, 1500 + clean.length * 120 / rate);
@@ -83,6 +94,7 @@ export function stopSpeaking(): void {
   if (Capacitor.isNativePlatform()) {
     void TextToSpeech.stop().catch(() => undefined);
   } else if (ttsAvailable()) {
+    if (window.speechSynthesis.speaking) lastAudioAt = Date.now();
     window.speechSynthesis.cancel();
   }
 }
