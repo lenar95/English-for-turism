@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Установка веб-версии «Английский в поездку» на VPS (Ubuntu 22.04/24.04).
 #
-# Запуск на сервере под root:
-#   curl -fsSL https://raw.githubusercontent.com/lenar95/English-for-turism/claude/relaxed-archimedes-kfq2pv/deploy/install.sh | bash -s -- ваш.домен ваш@email
+# Запуск на сервере под root (у домена должны быть DNS-записи A/AAAA на сервер и CNAME www на сам домен):
+#   curl -fsSL https://raw.githubusercontent.com/lenar95/English-for-turism/claude/relaxed-archimedes-kfq2pv/deploy/install.sh | bash -s -- engtrip.ru ваш@email
 #
 # Email нужен центрам сертификации: без него не работает запасной центр ZeroSSL,
 # а Let's Encrypt может отказать, если на общий домен хостинга уже выпущено слишком много сертификатов.
@@ -101,6 +101,11 @@ $DOMAIN {
 	}
 
 	file_server
+}
+
+# www.домен — на основной домен.
+www.$DOMAIN {
+	redir https://$DOMAIN{uri} permanent
 }
 
 # Заход по IP перенаправляем на домен с HTTPS.

@@ -121,10 +121,10 @@ Workflow `.github/workflows/pages.yml` публикует сайт при пуш
 Workflow `.github/workflows/web-build.yml` на каждый пуш собирает сайт и кладёт готовые файлы в ветку `web-build`.
 Сервер раз в 2 минуты сам подтягивает эту ветку, поэтому ключи и пароли от сервера в GitHub хранить не нужно.
 
-Установка на чистый Ubuntu 22.04/24.04 (под root, домен должен указывать на IP сервера):
+Сайт работает на **https://engtrip.ru**. Установка на чистый Ubuntu 22.04/24.04 (под root; у домена должны быть записи A/AAAA на IP сервера и CNAME `www` на сам домен):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lenar95/English-for-turism/claude/relaxed-archimedes-kfq2pv/deploy/install.sh | bash -s -- ваш.домен ваш@email
+curl -fsSL https://raw.githubusercontent.com/lenar95/English-for-turism/claude/relaxed-archimedes-kfq2pv/deploy/install.sh | bash -s -- engtrip.ru ваш@email
 ```
 
 Скрипт ставит Caddy с автоматическим HTTPS от Let's Encrypt (без HTTPS браузер не даст доступ к микрофону)
