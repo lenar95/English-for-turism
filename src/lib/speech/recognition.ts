@@ -91,6 +91,73 @@ export function listen(opts: ListenOptions = {}): ListenSession {
   return Capacitor.isNativePlatform() ? listenNative(opts) : listenWeb(opts);
 }
 
+/**
+ * Режимы работы на iPhone. Safari после первой записи иногда включает микрофон,
+ * но не передаёт звук в распознавание. Если попытка прошла «вхолостую»,
+ * переключаемся на следующий режим и запоминаем тот, что сработал.
+ * 0 — обычный;
+ * 1 — держим микрофон открытым (getUserMedia), чтобы iOS не переключала звук в режим воспроизведения;
+ * 2 — то же + без промежуточных результатов и со свежим объектом на каждую запись.
+ */
+const STRATEGY_KEY = 'eft:speech-strategy';
+const isIOS =
+  typeof navigator !== 'undefined' &&
+  (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+let strategy = (() => {
+  try {
+    const saved = localStorage.getItem(STRATEGY_KEY);
+    if (saved !== null) return Math.min(2, Number(saved) || 0);
+  } catch {
+    /* ignore */
+  }
+  // На iPhone обычный режим после первой записи перестаёт получать звук — сразу держим микрофон открытым.
+  return isIOS ? 1 : 0;
+})();
+let emptyInRow = 0;
+
+function setStrategy(n: number, why: string) {
+  strategy = n;
+  emptyInRow = 0;
+  diag(`режим ${n}: ${why}`);
+  try {
+    localStorage.setItem(STRATEGY_KEY, String(n));
+  } catch {
+    /* ignore */
+  }
+}
+
+let micStream: MediaStream | null = null;
+let micRequest: Promise<void> | null = null;
+
+// Ушли со страницы — отпускаем микрофон (иначе горит значок записи). Вернёмся — откроем снова при записи.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && micStream) {
+      micStream.getTracks().forEach((t) => t.stop());
+      micStream = null;
+      diag('страница скрыта — микрофон отпущен');
+    }
+  });
+}
+
+/** Открыть микрофон и держать поток, пока открыта страница. */
+function keepMicOpen(): Promise<void> {
+  if (micStream && micStream.getAudioTracks().some((t) => t.readyState === 'live')) return Promise.resolve();
+  if (micRequest) return micRequest;
+  if (!navigator.mediaDevices?.getUserMedia) return Promise.resolve();
+  micRequest = navigator.mediaDevices
+    .getUserMedia({ audio: true })
+    .then((stream) => {
+      micStream = stream;
+      diag('микрофон удерживается открытым');
+    })
+    .catch((err: unknown) => diag(`getUserMedia не сработал: ${err instanceof Error ? err.name : String(err)}`))
+    .finally(() => {
+      micRequest = null;
+    });
+  return micRequest;
+}
+
 /** Активная запись в браузере: одновременно может идти только одна. */
 let activeWeb: { abort(): void } | null = null;
 
@@ -153,6 +220,8 @@ function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 
   let settled = false;
   let aborted = false;
   let audioStarted = false;
+  let speechHeard = false;
+  const startedAt = Date.now();
   let restarts = 0;
   const timers = new Set<ReturnType<typeof setTimeout>>();
   const later = (fn: () => void, ms: number) => {
@@ -194,9 +263,20 @@ function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 
     }
     if (activeWeb === session) activeWeb = null;
     log(`конец (${why}): ${alternatives.length ? `«${alternatives[0]}»` : error ? `ошибка ${error.message}` : 'ничего'}`);
+    // Микрофон включился, но за 2,5+ с не пришло ни звука речи, ни текста — попытка «вхолостую».
+    if (!aborted && !alternatives.length && audioStarted && !speechHeard && Date.now() - startedAt > 2500) {
+      emptyInRow++;
+      log(`холостая попытка (${emptyInRow} подряд, режим ${strategy})`);
+      if (emptyInRow >= (strategy === 0 ? 1 : 2) && strategy < 2) {
+        setStrategy(strategy + 1, strategy === 0 ? 'держим микрофон открытым' : 'без промежуточных результатов, свежий объект');
+      }
+    } else if (alternatives.length) {
+      emptyInRow = 0;
+    }
     if (aborted) rejectResult(new RecognitionError('aborted'));
     else if (alternatives.length) resolveResult(alternatives);
-    else rejectResult(error ?? new RecognitionError('no-speech'));
+    // Ошибку «aborted» от самого браузера показываем как «не услышали», а не молча сбрасываем кнопку.
+    else rejectResult(error && error.code !== 'aborted' ? error : new RecognitionError('no-speech'));
   };
 
   /** Мягкая остановка: просим браузер закончить, но ждём недолго. */
@@ -213,10 +293,10 @@ function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 
 
   const begin = (fresh: boolean) => {
     if (settled) return;
-    const r = takeRecognition(Ctor, fresh || sharedRunning);
+    const r = takeRecognition(Ctor, fresh || sharedRunning || strategy >= 2);
     rec = r;
     r.lang = lang;
-    r.interimResults = true;
+    r.interimResults = strategy < 2;
     r.maxAlternatives = 5;
     r.continuous = false;
     r.onstart = () => log('onstart');
@@ -224,9 +304,13 @@ function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 
       audioStarted = true;
       log('микрофон включился');
     };
-    r.onspeechstart = () => log('слышна речь');
+    r.onspeechstart = () => {
+      speechHeard = true;
+      log('слышна речь');
+    };
     r.onresult = (e) => {
       audioStarted = true;
+      speechHeard = true;
       // Склеиваем все сегменты: для каждой гипотезы берём её вариант в каждом сегменте.
       const segs = Array.from(e.results);
       const maxAlt = Math.max(...segs.map((x) => x.length));
@@ -293,10 +377,20 @@ function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 
     },
   };
   activeWeb = session;
-  // Если только что звучала озвучка, даём браузеру переключить аудио с динамика на микрофон.
+  log(`режим ${strategy}`);
+  // iOS строже к микрофону, если запись начинается не прямо в обработчике нажатия,
+  // поэтому по возможности стартуем синхронно.
   const wait = Math.max(0, 500 - msSinceSpeech());
-  if (wait) log(`пауза ${wait} мс после озвучки`);
-  later(() => begin(false), wait);
+  const needMic = strategy >= 1 && !(micStream && micStream.getAudioTracks().some((t) => t.readyState === 'live'));
+  if (needMic) {
+    void keepMicOpen().then(() => later(() => begin(false), Math.max(0, 500 - msSinceSpeech())));
+  } else if (wait) {
+    // Только что звучала озвучка — даём браузеру переключить аудио с динамика на микрофон.
+    log(`пауза ${wait} мс после озвучки`);
+    later(() => begin(false), wait);
+  } else {
+    begin(false);
+  }
   // Ни одного слова за 9 с — не висим, а сообщаем, что ничего не услышали.
   later(() => {
     if (!alternatives.length) finish('ничего не распознано за 9 с');
