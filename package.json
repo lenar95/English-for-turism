@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && npm run prerender",
+    "prerender": "esbuild scripts/prerender.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/prerender.cjs --log-level=warning && node node_modules/.cache/prerender.cjs",
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
