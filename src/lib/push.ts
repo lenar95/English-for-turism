@@ -70,19 +70,38 @@ async function api(path: string, body: unknown): Promise<Response> {
 export const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 /** Запросить разрешение и подписаться. Вызывать только из обработчика нажатия (требование iOS). */
-export async function enablePush(identity: PushIdentity, time: string, snapshot: PushSnapshot): Promise<'ok' | 'denied' | 'error'> {
+export type EnableResult = { status: 'ok' } | { status: 'denied' } | { status: 'error'; detail: string };
+
+/** Текст ответа сервера (для диагностики). */
+async function describe(res: Response): Promise<string> {
+  const text = (await res.text().catch(() => '')).slice(0, 120);
+  return `HTTP ${res.status}${text && !text.startsWith('<') ? `: ${text}` : text.startsWith('<') ? ' (вернулась страница вместо ответа сервиса)' : ''}`;
+}
+
+export async function enablePush(identity: PushIdentity, time: string, snapshot: PushSnapshot): Promise<EnableResult> {
   const permission = await Notification.requestPermission();
-  if (permission !== 'granted') return 'denied';
+  if (permission !== 'granted') return { status: 'denied' };
   const reg = (await registerServiceWorker()) ?? (await navigator.serviceWorker.ready);
-  const keyRes = await fetch('./api/push/key');
-  if (!keyRes.ok) return 'error';
+  let keyRes: Response;
+  try {
+    keyRes = await fetch('./api/push/key', { cache: 'no-store' });
+  } catch (e) {
+    return { status: 'error', detail: `ключ: сеть (${e instanceof Error ? e.message : String(e)})` };
+  }
+  const type = keyRes.headers.get('content-type') ?? '';
+  if (!keyRes.ok || !type.includes('json')) return { status: 'error', detail: `ключ: ${await describe(keyRes)}` };
   const { publicKey } = (await keyRes.json()) as { publicKey: string };
-  let sub = await reg.pushManager.getSubscription();
-  if (!sub) {
-    sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
+  let sub: PushSubscription | null;
+  try {
+    sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
+    }
+  } catch (e) {
+    return { status: 'error', detail: `подписка браузера: ${e instanceof Error ? `${e.name} ${e.message}` : String(e)}` };
   }
   const res = await api('subscribe', { ...identity, subscription: sub.toJSON(), time, tz: timeZone(), snapshot });
-  return res.ok ? 'ok' : 'error';
+  return res.ok ? { status: 'ok' } : { status: 'error', detail: `сохранение: ${await describe(res)}` };
 }
 
 export async function disablePush(identity: PushIdentity): Promise<void> {

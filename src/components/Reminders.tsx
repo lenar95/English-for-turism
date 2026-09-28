@@ -29,20 +29,20 @@ export function Reminders() {
       if (on) {
         const id = app.ensurePushId();
         const r = await enablePush(id, settings.reminderTime, app.pushSnapshot());
-        if (r === 'ok') {
+        if (r.status === 'ok') {
           app.updateSettings({ reminders: true });
           setNote('Готово! Напоминание придёт в выбранное время, если в этот день вы ещё не занимались.');
-        } else if (r === 'denied') {
+        } else if (r.status === 'denied') {
           setNote('Уведомления запрещены. Разрешите их в настройках iPhone: Настройки → Уведомления → В поездку.');
         } else {
-          setNote('Не удалось связаться с сервером. Попробуйте позже.');
+          setNote(`Не удалось включить напоминания. Подробности для разработчика: ${r.detail}`);
         }
       } else {
         if (app.data.pushId) await disablePush(app.data.pushId);
         app.updateSettings({ reminders: false });
       }
-    } catch {
-      setNote('Не получилось включить напоминания. Попробуйте ещё раз.');
+    } catch (e) {
+      setNote(`Не получилось включить напоминания: ${e instanceof Error ? `${e.name} ${e.message}` : String(e)}`);
     } finally {
       setBusy(false);
     }
