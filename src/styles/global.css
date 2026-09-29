@@ -2051,14 +2051,14 @@ details[open] summary .chev {
   --arena-b: #22b8d8;
   --glass: rgba(255, 255, 255, 0.24);
   --on-arena: #ffffff;
-  min-height: 100dvh;
-  color: var(--on-arena);
-  background:
+  --arena-bg:
     radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.14) 0 64px, transparent 65px),
     radial-gradient(circle at 88% 42%, rgba(255, 255, 255, 0.1) 0 88px, transparent 89px),
-    radial-gradient(circle at 24% 86%, rgba(255, 255, 255, 0.09) 0 72px, transparent 73px),
-    linear-gradient(150deg, var(--arena-a), var(--arena-b));
-  background-attachment: fixed;
+    linear-gradient(180deg, var(--arena-a), var(--arena-b));
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  color: var(--on-arena);
   transition:
     --arena-a 0.6s ease,
     --arena-b 0.6s ease;
@@ -2072,14 +2072,24 @@ details[open] summary .chev {
 .arena--help { --arena-a: #e9483f; --arena-b: #f2765a; }
 .arena--departure { --arena-a: #8757e8; --arena-b: #c05fe0; }
 
+/* Фон — отдельный закреплённый слой: одинаково работает в Safari на iPhone и на компьютере.
+ * Градиент вертикальный, поэтому низ экрана одного цвета по всей ширине — подложка кнопок сливается с ним. */
+.arena::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--arena-bg);
+  pointer-events: none;
+}
+
 @media (prefers-color-scheme: dark) {
   .arena {
     --glass: rgba(255, 255, 255, 0.1);
-    background:
+    --arena-bg:
       radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.06) 0 64px, transparent 65px),
       radial-gradient(circle at 88% 42%, rgba(255, 255, 255, 0.05) 0 88px, transparent 89px),
-      linear-gradient(150deg, color-mix(in srgb, var(--arena-a) 55%, #0d0f14), color-mix(in srgb, var(--arena-b) 45%, #0d0f14));
-    background-attachment: fixed;
+      linear-gradient(180deg, color-mix(in srgb, var(--arena-a) 55%, #0d0f14), color-mix(in srgb, var(--arena-b) 45%, #0d0f14));
   }
 }
 
@@ -2239,18 +2249,27 @@ details[open] summary .chev {
   color: #fff;
 }
 
+.arena {
+  overflow-x: clip;
+}
+
 .arena .sticky-footer {
-  /* Подложка в цвет низа градиента: кнопки читаются поверх прокручиваемых карточек. */
-  background: linear-gradient(to top, var(--arena-b) 72%, transparent);
-  margin-left: -16px;
-  margin-right: -16px;
-  padding-left: 16px;
-  padding-right: 16px;
+  /* Подложка на всю ширину экрана с плавным исчезновением кверху: снизу она совпадает
+   * с цветом фона, поэтому краёв не видно, а прокручиваемые карточки уходят под неё. */
+  margin-inline: calc(50% - 50vw);
+  padding-inline: calc(50vw - 50%);
+  padding-top: 40px;
+  background: linear-gradient(to top, var(--arena-b) 0%, var(--arena-b) 68%, transparent 100%);
 }
 
 @media (prefers-color-scheme: dark) {
   .arena .sticky-footer {
-    background: linear-gradient(to top, color-mix(in srgb, var(--arena-b) 45%, #0d0f14) 72%, transparent);
+    background: linear-gradient(
+      to top,
+      color-mix(in srgb, var(--arena-b) 45%, #0d0f14) 0%,
+      color-mix(in srgb, var(--arena-b) 45%, #0d0f14) 68%,
+      transparent 100%
+    );
   }
 }
 
