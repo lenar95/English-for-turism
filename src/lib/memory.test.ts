@@ -27,12 +27,23 @@ describe('модель памяти', () => {
     expect(m.level).toBe(4);
   });
 
-  it('ошибка понижает уровень на 2', () => {
+  it('ошибка понижает уровень на 2 и назначает повтор на завтра', () => {
     let m = emptyMemory();
     for (let d = 0; d < 4; d++) m = applyAnswer(m, true, 'recall', true, T0 + d * DAY);
     expect(m.level).toBe(4);
+    expect(isDue(m, T0 + 5 * DAY)).toBe(false); // на уровне 4 стабильность 16 дней
     m = applyAnswer(m, false, 'recall', true, T0 + 5 * DAY);
     expect(m.level).toBe(2);
+    expect(isDue(m, T0 + 5 * DAY + DAY / 2)).toBe(false);
+    expect(isDue(m, T0 + 6 * DAY)).toBe(true);
+  });
+
+  it('фраза, которую ни разу не вспомнили, всё равно попадает в «пора повторить»', () => {
+    expect(isDue(emptyMemory(), T0)).toBe(false);
+    const failed = applyAnswer(emptyMemory(), false, 'recall', true, T0);
+    expect(failed.level).toBe(0);
+    expect(isDue(failed, T0 + DAY / 2)).toBe(false);
+    expect(isDue(failed, T0 + DAY)).toBe(true);
   });
 
   it('со временем фраза забывается, и её пора повторить', () => {

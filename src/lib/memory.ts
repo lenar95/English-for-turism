@@ -25,11 +25,13 @@ export interface MemoryState {
   level: number;
   /** Время последнего повторения, мс. */
   last: number;
+  /** Когда фразу пора повторить, мс. После верного ответа — через «стабильность» уровня, после ошибки — на следующий день. */
+  due: number;
   reviews: number;
   correct: number;
 }
 
-export const emptyMemory = (): MemoryState => ({ level: 0, last: 0, reviews: 0, correct: 0 });
+export const emptyMemory = (): MemoryState => ({ level: 0, last: 0, due: 0, reviews: 0, correct: 0 });
 
 /**
  * Узнавание среди вариантов подтверждает, что фраза знакома, но не что вы её вспомните.
@@ -57,11 +59,14 @@ export function applyAnswer(
     const dayCap = sameDay ? (kind === 'recall' ? 4 : 2) : MAX_LEVEL;
     if (level < cap) level = Math.min(level + 1, cap, Math.max(dayCap, level));
   } else {
+    // Ошибка опускает на два уровня, а повтор назначается на завтра: сила памяти
+    // отражает, что фраза в целом знакома, но проверить её нужно скоро.
     level = Math.max(0, level - 2);
   }
   return {
     level,
     last: now,
+    due: now + (correct ? stabilityDays(level) : 1) * DAY,
     reviews: m.reviews + 1,
     correct: m.correct + (correct ? 1 : 0),
   };
@@ -84,8 +89,8 @@ export function memoryStrength(m: MemoryState | undefined, now: number): number 
   return (m.level / MAX_LEVEL) * retention(m, now);
 }
 
-/** Пора ли повторить фразу. */
+/** Пора ли повторить фразу. Фраза, которую ещё ни разу не тренировали, не «пора», а новая. */
 export function isDue(m: MemoryState | undefined, now: number): boolean {
-  if (!m || m.level === 0) return false;
-  return now - m.last >= stabilityDays(m.level) * DAY;
+  if (!m || m.reviews === 0) return false;
+  return now >= m.due;
 }

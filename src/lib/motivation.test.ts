@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { scenarios } from '../data';
-import type { AnswerEvent, SessionLog } from '../state/model';
+import { defaultData, type AnswerEvent, type SessionLog } from '../state/model';
 import { dayKey } from './dates';
 import { createAdaptiveSession, difficultyShift, isSuccess } from './adaptive';
-import { activeThisWeek, dailyPlan, readMotivation } from './motivation';
+import { activeThisWeek, dailyPlan, freezePlan, planIsCurrent, readMotivation, todayPlan } from './motivation';
 
 const DAY = 86400000;
 const NOW = new Date('2026-10-01T12:00:00').getTime();
@@ -52,6 +52,33 @@ describe('план на день', () => {
   it('считает сделанное сегодня', () => {
     const r = readMotivation([], [], [], NOW);
     expect(dailyPlan(trip, {}, answers(7, 1), '', r, NOW).done).toBe(7);
+  });
+});
+
+describe('план на день фиксируется', () => {
+  const trip = scenarios.slice(0, 3);
+  it('после разминки цель не скачет до следующего дня', () => {
+    // Вернулся после перерыва: план сжат до минимального шага.
+    let data = {
+      ...defaultData(),
+      activeDays: days(5, 6),
+      answers: answers(30, 0.85, NOW - 5 * DAY),
+      trip: { ...defaultData().trip, date: dayKey(NOW + 10 * DAY) },
+    };
+    const fresh = todayPlan(data, trip, NOW);
+    expect(fresh.minimal).toBe(true);
+    data = { ...data, todayPlan: freezePlan(fresh, data.trip, NOW) };
+    // Сделал пять заданий: состояние уже не «вернулся», но план прежний, а сделанное считается живьём.
+    data = { ...data, answers: [...data.answers, ...answers(5, 1, NOW + 60000)], activeDays: [...data.activeDays, dayKey(NOW)] };
+    expect(readMotivation(data.answers, data.sessions, data.activeDays, NOW + 60000).state).not.toBe('returning');
+    const after = todayPlan(data, trip, NOW + 60000);
+    expect(after.goal).toBe(fresh.goal);
+    expect(after.minimal).toBe(true);
+    expect(after.done).toBe(5);
+    // Назавтра и при смене даты вылета план считается заново.
+    expect(planIsCurrent(data.todayPlan, data.trip, NOW + DAY)).toBe(false);
+    expect(todayPlan(data, trip, NOW + DAY).goal).toBeGreaterThan(fresh.goal);
+    expect(planIsCurrent(data.todayPlan, { ...data.trip, date: dayKey(NOW + 3 * DAY) }, NOW)).toBe(false);
   });
 });
 

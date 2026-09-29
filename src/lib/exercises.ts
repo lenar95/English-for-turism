@@ -89,17 +89,23 @@ export function makeExercise(
     phrase: target.phrase,
     scenarioId: target.scenario.id,
   };
-  if (type === 'choose-en' || type === 'listen') {
-    ex.options = shuffle([target.phrase, ...pickDistractors(target, pool, 3, rng)], rng);
-  }
-  if (type === 'build') {
-    const words = phraseWords(target.phrase.en);
+  // Варианты ответа и плитки готовим для любого типа: если микрофон недоступен
+  // или пропал посреди сессии, речевое задание показывается письменным (withoutSpeech).
+  ex.options = shuffle([target.phrase, ...pickDistractors(target, pool, 3, rng)], rng);
+  const words = phraseWords(target.phrase.en);
+  if (words.length >= 3) {
     let tiles = shuffle(words, rng);
     // Не показываем слова сразу в правильном порядке.
     for (let i = 0; i < 5 && tiles.join(' ') === words.join(' '); i++) tiles = shuffle(words, rng);
     ex.tiles = tiles;
   }
   return ex;
+}
+
+/** Письменная замена речевого задания, когда микрофон недоступен. Ключ задания сохраняется. */
+export function withoutSpeech(ex: Exercise): Exercise {
+  if (ex.type !== 'speak' && ex.type !== 'recall-speak') return ex;
+  return { ...ex, type: ex.tiles ? 'build' : 'choose-en' };
 }
 
 function locate(scenarios: Scenario[]): Located[] {

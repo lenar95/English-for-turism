@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { scenarios } from '../data';
 import { createAdaptiveSession, type OutcomeLike } from './adaptive';
-import { buildExam, isBuildCorrect, phraseWords } from './exercises';
+import { buildExam, isBuildCorrect, makeExercise, phraseWords, withoutSpeech, type ExerciseType } from './exercises';
 
 function seeded(seed: number) {
   return () => {
@@ -40,6 +40,23 @@ describe('упражнения', () => {
     const types = new Set(exam.map((e) => e.type));
     for (const t of ['listen', 'choose-en', 'build', 'speak', 'recall-speak']) expect(types).toContain(t);
     expect(new Set(exam.map((e) => e.phrase.id)).size).toBe(20);
+  });
+
+  it('речевое задание можно показать письменным: варианты и плитки есть у любого типа', () => {
+    const pool = scenarios.slice(0, 2).flatMap((scenario) => scenario.phrases.map((phrase) => ({ phrase, scenario })));
+    const you = pool.filter((l) => l.phrase.speaker === 'you');
+    const long = you.find((l) => phraseWords(l.phrase.en).length >= 3)!;
+    const short = you.find((l) => phraseWords(l.phrase.en).length < 3)!;
+    for (const type of ['choose-en', 'listen', 'build', 'speak', 'recall-speak'] as ExerciseType[]) {
+      const ex = makeExercise(type, long, pool, seeded(5));
+      expect(ex.options).toHaveLength(4);
+      expect(ex.tiles!.length).toBeGreaterThanOrEqual(3);
+    }
+    const spoken = makeExercise('speak', long, pool, seeded(5));
+    expect(withoutSpeech(spoken)).toMatchObject({ key: spoken.key, type: 'build' });
+    expect(withoutSpeech(makeExercise('recall-speak', short, pool, seeded(5))).type).toBe('choose-en');
+    const listen = makeExercise('listen', long, pool, seeded(5));
+    expect(withoutSpeech(listen)).toBe(listen);
   });
 
   it('без микрофона в проверке нет речевых заданий', () => {

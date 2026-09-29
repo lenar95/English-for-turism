@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Phrase } from '../data/types';
 import { isSuccess, type ExerciseSource } from '../lib/adaptive';
-import { exerciseChecks, isBuildCorrect, RECALL_PASS_SCORE, type Exercise } from '../lib/exercises';
+import { exerciseChecks, isBuildCorrect, RECALL_PASS_SCORE, withoutSpeech, type Exercise } from '../lib/exercises';
 import type { SessionKind } from '../state/model';
 import type { PronunciationResult } from '../lib/pronunciation';
 import { scenarioById } from '../data';
@@ -89,11 +89,14 @@ export function ExerciseRunner({ source, kind, mode, onFinish, onExit }: Props) 
   };
 
   if (!exercise) return null;
+  // Микрофон недоступен или пропал посреди сессии: речевое задание показываем письменным.
+  // Подменяем само задание, чтобы ответ записался как задание на память, а не на произношение.
+  const shown = app.speechOn ? exercise : withoutSpeech(exercise);
 
   return (
     // «Арена»: яркий градиент в цвете этапа поездки — как в тренажёрах внимания,
     // энергичный фон нужен в момент действия, а экраны статистики остаются спокойными.
-    <div className={`arena arena--${scenarioById[exercise.scenarioId]?.stage ?? 'basics'}`}>
+    <div className={`arena arena--${scenarioById[shown.scenarioId]?.stage ?? 'basics'}`}>
     <div className="page page--bare" style={{ minHeight: '100dvh' }}>
       <div className="row">
         <button type="button" className="icon-btn icon-btn--plain" onClick={exit} aria-label="Выйти">
@@ -110,8 +113,8 @@ export function ExerciseRunner({ source, kind, mode, onFinish, onExit }: Props) 
       </div>
 
       <ExerciseView
-        key={exercise.key}
-        exercise={exercise}
+        key={shown.key}
+        exercise={shown}
         mode={mode}
         onAnswered={(o) => {
           // Вибрация на выбор ответа; у речевых заданий она срабатывает в самой проверке произношения.
@@ -144,10 +147,7 @@ interface ViewProps {
 }
 
 function ExerciseView(props: ViewProps) {
-  const { exercise, speechOn } = props;
-  let type = exercise.type;
-  // Если микрофон недоступен, речевые задания заменяем письменными.
-  if (!speechOn && (type === 'speak' || type === 'recall-speak')) type = exercise.tiles ? 'build' : 'choose-en';
+  const { type } = props.exercise;
   return (
     <div className="exercise">
       <span className="exercise__kind">{KIND_LABEL[type]}</span>

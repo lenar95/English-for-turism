@@ -1,5 +1,5 @@
 import { DAY, dayKey } from '../lib/dates';
-import { applyAnswer, MAX_LEVEL, type AnswerKind, type MemoryState } from '../lib/memory';
+import { applyAnswer, MAX_LEVEL, stabilityDays, type AnswerKind, type MemoryState } from '../lib/memory';
 import { emptyPhraseProgress, PRON_HISTORY, pushPron, type PhraseProgress } from '../lib/progress';
 import type { Accent } from '../lib/speech/tts';
 
@@ -33,6 +33,8 @@ export interface ExamRecord {
   memory: number;
   pronunciation: number | null;
   questions: number;
+  /** Проверялось ли произношение. Без него итог считается только по памяти и с другими проверками не сравним. */
+  withPronunciation: boolean;
 }
 
 /** Один ответ пользователя — для оценки точности и дневного прогресса. */
@@ -55,6 +57,21 @@ export interface SessionLog {
   exitedEarly: boolean;
 }
 
+/**
+ * План на день, зафиксированный при первом расчёте. Цель не меняется до полуночи,
+ * даже если состояние ученика изменилось: после «разминки на минуту» человек не должен
+ * увидеть, что план вырос до 25 заданий.
+ */
+export interface TodayPlan {
+  day: string;
+  /** Отпечаток поездки: смена даты вылета или набора ситуаций пересчитывает план. */
+  tripKey: string;
+  goal: number;
+  minimal: boolean;
+  focusKey: boolean;
+  message: string;
+}
+
 export interface AppData {
   version: 1;
   onboarded: boolean;
@@ -74,6 +91,7 @@ export interface AppData {
   weeklyGoal: number;
   /** Анонимный идентификатор для напоминаний (без личных данных). */
   pushId: { id: string; token: string } | null;
+  todayPlan: TodayPlan | null;
 }
 
 export const defaultData = (): AppData => ({
@@ -89,6 +107,7 @@ export const defaultData = (): AppData => ({
   sessions: [],
   weeklyGoal: 4,
   pushId: null,
+  todayPlan: null,
 });
 
 /**
@@ -121,6 +140,7 @@ export type Action =
   | { type: 'session'; log: SessionLog }
   | { type: 'weeklyGoal'; days: number }
   | { type: 'pushId'; pushId: { id: string; token: string } }
+  | { type: 'todayPlan'; plan: TodayPlan }
   | { type: 'reset' };
 
 export function reducer(data: AppData, action: Action): AppData {
@@ -161,6 +181,8 @@ export function reducer(data: AppData, action: Action): AppData {
       return { ...data, sessions: [...data.sessions, action.log].slice(-100) };
     case 'pushId':
       return { ...data, pushId: action.pushId };
+    case 'todayPlan':
+      return { ...data, todayPlan: action.plan };
     case 'weeklyGoal':
       return { ...data, weeklyGoal: Math.max(1, Math.min(7, action.days)) };
     case 'badges':
@@ -196,9 +218,13 @@ const fixDay = (x: unknown): string | null => (isStr(x) && /^\d{4}-\d{2}-\d{2}$/
 function fixProgress(raw: unknown): PhraseProgress | null {
   if (!isObj(raw)) return null;
   const m = isObj(raw.memory) ? raw.memory : {};
+  const level = Math.min(MAX_LEVEL, count(m.level));
+  const last = count(m.last);
   const memory: MemoryState = {
-    level: Math.min(MAX_LEVEL, count(m.level)),
-    last: count(m.last),
+    level,
+    last,
+    // Поле появилось позже: для старых записей срок повтора считаем от последнего ответа.
+    due: count(m.due, last + stabilityDays(level) * DAY),
     reviews: count(m.reviews),
     correct: count(m.correct),
   };
@@ -220,7 +246,13 @@ const fixExam = (x: unknown): ExamRecord | null =>
         memory: isNum(x.memory) ? x.memory : x.total,
         pronunciation: isNum(x.pronunciation) ? x.pronunciation : null,
         questions: count(x.questions),
+        withPronunciation: typeof x.withPronunciation === 'boolean' ? x.withPronunciation : isNum(x.pronunciation),
       }
+    : null;
+
+const fixPlan = (x: unknown): TodayPlan | null =>
+  isObj(x) && fixDay(x.day) && isStr(x.tripKey) && isNum(x.goal) && isStr(x.message)
+    ? { day: x.day as string, tripKey: x.tripKey, goal: count(x.goal, 1), minimal: x.minimal === true, focusKey: x.focusKey === true, message: x.message }
     : null;
 
 const fixSession = (x: unknown): SessionLog | null =>
@@ -281,5 +313,6 @@ export function migrate(raw: unknown): AppData {
     sessions: list(raw.sessions, fixSession).slice(-100),
     weeklyGoal: isNum(raw.weeklyGoal) ? Math.max(1, Math.min(7, Math.round(raw.weeklyGoal))) : base.weeklyGoal,
     pushId,
+    todayPlan: fixPlan(raw.todayPlan),
   };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DAY, dayKey } from '../lib/dates';
+import { stabilityDays } from '../lib/memory';
 import { defaultData, migrate, reducer, streak, type AppData } from './model';
 
 const NOW = new Date(2026, 5, 15, 12).getTime();
@@ -32,7 +33,7 @@ describe('reducer', () => {
     expect(d.answers).toHaveLength(300);
     expect(d.answers[0].phraseId).toBe('p-10');
     for (let i = 0; i < 105; i++) {
-      d = reducer(d, { type: 'exam', record: { at: NOW + i, scenarioId: null, total: i, memory: i, pronunciation: null, questions: 10 } });
+      d = reducer(d, { type: 'exam', record: { at: NOW + i, scenarioId: null, total: i, memory: i, pronunciation: null, questions: 10, withPronunciation: false } });
       d = reducer(d, { type: 'session', log: { start: NOW, end: NOW + i, kind: 'practice', planned: 10, done: 10, correct: 5, exitedEarly: false } });
     }
     expect(d.exams).toHaveLength(100);
@@ -122,9 +123,10 @@ describe('migrate', () => {
         empty: null,
       },
     });
-    expect(d.progress.ok).toEqual({ memory: { level: 3, last: 5, reviews: 4, correct: 3 }, pron: [80, 90] });
-    expect(d.progress.noPron).toEqual({ memory: { level: 2, last: 5, reviews: 2, correct: 2 }, pron: [] });
-    expect(d.progress.badLevel).toEqual({ memory: { level: 0, last: 0, reviews: 1, correct: 0 }, pron: [50] });
+    // Срок повтора у старых записей считается от последнего ответа и стабильности уровня.
+    expect(d.progress.ok).toEqual({ memory: { level: 3, last: 5, due: 5 + stabilityDays(3) * DAY, reviews: 4, correct: 3 }, pron: [80, 90] });
+    expect(d.progress.noPron).toEqual({ memory: { level: 2, last: 5, due: 5 + stabilityDays(2) * DAY, reviews: 2, correct: 2 }, pron: [] });
+    expect(d.progress.badLevel).toEqual({ memory: { level: 0, last: 0, due: 0, reviews: 1, correct: 0 }, pron: [50] });
     expect(d.progress.tooHigh.memory.level).toBe(5);
     expect(d.progress.garbage).toBeUndefined();
     expect(d.progress.empty).toBeUndefined();
@@ -143,9 +145,11 @@ describe('migrate', () => {
     });
     expect(d.answers).toEqual([{ t: 1, phraseId: 'a', ok: true }]);
     expect(d.exams).toEqual([
-      { at: 1, scenarioId: null, total: 50, memory: 50, pronunciation: null, questions: 10 },
-      { at: 2, scenarioId: null, total: 70, memory: 70, pronunciation: null, questions: 0 },
+      { at: 1, scenarioId: null, total: 50, memory: 50, pronunciation: null, questions: 10, withPronunciation: false },
+      { at: 2, scenarioId: null, total: 70, memory: 70, pronunciation: null, questions: 0, withPronunciation: false },
     ]);
+    // Старые записи с оценкой произношения считаются проверками с микрофоном.
+    expect(migrate({ exams: [{ at: 3, total: 80, pronunciation: 70 }] }).exams[0].withPronunciation).toBe(true);
     expect(d.sessions).toHaveLength(2);
     expect(d.sessions[1]).toMatchObject({ kind: 'practice', planned: 0, exitedEarly: false });
     expect(d.activeDays).toEqual(['2026-06-01']);

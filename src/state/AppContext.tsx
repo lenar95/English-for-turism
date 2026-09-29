@@ -4,8 +4,8 @@ import type { Scenario } from '../data/types';
 import { allBadges, type Badge } from '../lib/badges';
 import { hapticSuccess } from '../lib/haptics';
 import type { AnswerKind } from '../lib/memory';
-import { dailyPlan, readMotivation } from '../lib/motivation';
-import { newIdentity, registerServiceWorker, sendStatus, type PushIdentity, type PushSnapshot } from '../lib/push';
+import { freezePlan, planIsCurrent, todayPlan, type DailyPlan } from '../lib/motivation';
+import { newIdentity, probeBackend, registerServiceWorker, sendStatus, type BackendState, type PushIdentity, type PushSnapshot } from '../lib/push';
 import { recognitionAvailable, recognitionLikelyAvailable } from '../lib/speech/recognition';
 import { defaultData, reducer, streak, type AppData, type ExamRecord, type SessionLog, type Settings, type Trip } from './model';
 import { loadData, saveData } from './storage';
@@ -17,7 +17,11 @@ interface AppContextValue {
   speechOn: boolean;
   /** Поддерживает ли устройство распознавание речи вообще. */
   speechSupported: boolean;
+  /** Есть ли за сайтом сервис напоминаний (на GitHub Pages и в нативном приложении его нет). */
+  backend: BackendState;
   tripScenarios: Scenario[];
+  /** План на сегодня: зафиксирован на день, «сделано» считается живьём. */
+  plan: DailyPlan;
   answer(phraseId: string, correct: boolean, kind: AnswerKind): void;
   pronunciation(phraseId: string, score: number): void;
   saveExam(record: ExamRecord): void;
@@ -42,6 +46,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [data, dispatch] = useReducer(reducer, undefined, defaultData);
   const [ready, setReady] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(recognitionLikelyAvailable());
+  const [backend, setBackend] = useState<BackendState>('unknown');
   const loaded = useRef(false);
 
   useEffect(() => {
@@ -51,6 +56,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setReady(true);
     });
     void recognitionAvailable().then(setSpeechSupported);
+    void probeBackend().then(setBackend);
   }, []);
 
   useEffect(() => {
@@ -82,8 +88,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return city ? [...general, ...city.scenarios] : general;
   }, [data.trip.scenarioIds, data.trip.cityId]);
 
+  // План на день фиксируется при первом расчёте за день (см. TodayPlan в model.ts).
+  const plan = useMemo(() => todayPlan(data, tripScenarios, Date.now()), [data, tripScenarios]);
+  useEffect(() => {
+    if (!ready) return;
+    const now = Date.now();
+    if (planIsCurrent(data.todayPlan, data.trip, now)) return;
+    dispatch({ type: 'todayPlan', plan: freezePlan(todayPlan(data, tripScenarios, now), data.trip, now) });
+  }, [ready, data, tripScenarios]);
+
   // Значки: считаем после каждого изменения данных. Полученные ещё до запуска
   // (например, при обновлении приложения) добавляем молча, без уведомлений.
+  // Готовность для значков считается с произношением, если устройство его поддерживает:
+  // выключение проверки в настройках не должно выдавать награды.
   const [toasts, setToasts] = useState<Badge[]>([]);
   const badgesPrimed = useRef(false);
   const speechOn = speechSupported && data.settings.pronunciation;
@@ -96,7 +113,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       streak: streak(data.activeDays, now),
       tripScenarios,
       now,
-      speechOn,
+      speechOn: speechSupported,
     }).filter((b) => b.earned && !data.badges.includes(b.id));
     if (earned.length) {
       dispatch({ type: 'badges', ids: earned.map((b) => b.id) });
@@ -106,7 +123,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
     badgesPrimed.current = true;
-  }, [ready, data.progress, data.exams, data.activeDays, data.badges, tripScenarios, speechOn]);
+  }, [ready, data.progress, data.exams, data.activeDays, data.badges, tripScenarios, speechSupported]);
   const dismissToast = useCallback((id: string) => setToasts((t) => t.filter((b) => b.id !== id)), []);
 
   useEffect(() => {
@@ -114,9 +131,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const pushSnapshot = useCallback((): PushSnapshot => {
-    const now = Date.now();
-    const reading = readMotivation(data.answers, data.sessions, data.activeDays, now);
-    const plan = dailyPlan(tripScenarios, data.progress, data.answers, data.trip.date, reading, now);
     const days = [...data.activeDays].sort();
     return {
       lastActiveDay: days[days.length - 1] ?? null,
@@ -125,7 +139,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       tripDate: data.trip.date,
       minimal: plan.minimal,
     };
-  }, [data, tripScenarios]);
+  }, [data, plan]);
 
   const ensurePushId = useCallback((): PushIdentity => {
     if (data.pushId) return data.pushId;
@@ -148,7 +162,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ready,
     speechOn,
     speechSupported,
+    backend,
     tripScenarios,
+    plan,
     answer,
     pronunciation,
     saveExam,

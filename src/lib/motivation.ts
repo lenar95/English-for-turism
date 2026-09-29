@@ -1,5 +1,5 @@
 import type { Scenario } from '../data/types';
-import type { AnswerEvent, SessionLog } from '../state/model';
+import type { AnswerEvent, AppData, SessionLog, TodayPlan, Trip } from '../state/model';
 import { DAY, dayKey, dayStart, daysUntil, parseDay } from './dates';
 import { isDue, retention } from './memory';
 import type { ProgressMap } from './readiness';
@@ -175,4 +175,40 @@ export function dailyPlan(
     goal = Math.min(goal, 12);
   }
   return { goal, done, minimal, message, daysLeft, focusKey };
+}
+
+/** Отпечаток поездки: при его смене план на день считается заново. */
+export function tripKey(trip: Trip): string {
+  return `${trip.date}|${trip.cityId}|${trip.scenarioIds.join(',')}`;
+}
+
+/** Слепок плана для хранения на день. */
+export function freezePlan(plan: DailyPlan, trip: Trip, now: number): TodayPlan {
+  return { day: dayKey(now), tripKey: tripKey(trip), goal: plan.goal, minimal: plan.minimal, focusKey: plan.focusKey, message: plan.message };
+}
+
+/** Актуален ли сохранённый план для этого дня и этой поездки. */
+export function planIsCurrent(plan: TodayPlan | null, trip: Trip, now: number): plan is TodayPlan {
+  return plan !== null && plan.day === dayKey(now) && plan.tripKey === tripKey(trip);
+}
+
+/**
+ * План на сегодня. Зафиксированный на этот день план имеет приоритет: цель не должна
+ * скакать после первой же тренировки, когда состояние «вернулся» сменяется на «в потоке».
+ * Сделанное сегодня считается всегда по живым данным.
+ */
+export function todayPlan(data: AppData, scenarios: Scenario[], now: number): DailyPlan {
+  const stored = data.todayPlan;
+  if (planIsCurrent(stored, data.trip, now)) {
+    return {
+      goal: stored.goal,
+      done: answeredToday(data.answers, now),
+      minimal: stored.minimal,
+      focusKey: stored.focusKey,
+      message: stored.message,
+      daysLeft: daysUntil(data.trip.date, now),
+    };
+  }
+  const reading = readMotivation(data.answers, data.sessions, data.activeDays, now);
+  return dailyPlan(scenarios, data.progress, data.answers, data.trip.date, reading, now);
 }

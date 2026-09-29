@@ -6,7 +6,6 @@ import { scenarioById } from '../data';
 import { createAdaptiveSession, fixedSource, type SessionMode } from '../lib/adaptive';
 import { buildExam } from '../lib/exercises';
 import { sessionInsight } from '../lib/insights';
-import { dailyPlan, readMotivation } from '../lib/motivation';
 import { useApp } from '../state/AppContext';
 
 /**
@@ -22,6 +21,9 @@ export function SessionPage({ mode }: { mode: 'practice' | 'exam' }) {
   const app = useApp();
   const [round, setRound] = useState(0);
   const [outcomes, setOutcomes] = useState<Outcome[] | null>(null);
+  // Доступность микрофона фиксируем на время сессии: задания уже подобраны под неё,
+  // а если микрофон пропадёт, раннер покажет речевые задания письменными.
+  const [speechOn] = useState(() => app.speechOn);
 
   const scenario = scope === 'trip' ? null : scenarioById[scope];
   const pool = scenario ? [scenario] : app.tripScenarios;
@@ -29,20 +31,12 @@ export function SessionPage({ mode }: { mode: 'practice' | 'exam' }) {
 
   // Набор заданий фиксируется на время раунда, чтобы не перестраиваться после каждого ответа.
   // Если к вылету всё не успеть, план сужается до ключевых фраз — тренировка тоже.
-  const now = Date.now();
-  const focusKey = dailyPlan(
-    pool,
-    app.data.progress,
-    app.data.answers,
-    app.data.trip.date,
-    readMotivation(app.data.answers, app.data.sessions, app.data.activeDays, now),
-    now,
-  ).focusKey;
+  const focusKey = app.plan.focusKey;
   const source = useMemo(
     () =>
       mode === 'exam'
-        ? fixedSource(buildExam(pool, app.speechOn, scenario ? 10 : 20))
-        : createAdaptiveSession(pool, app.data.progress, Date.now(), app.speechOn, size, sessionMode, Math.random, focusKey),
+        ? fixedSource(buildExam(pool, speechOn, scenario ? 10 : 20))
+        : createAdaptiveSession(pool, app.data.progress, Date.now(), speechOn, size, sessionMode, Math.random, focusKey),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [round, scope, mode, sessionMode, app.ready],
   );
@@ -68,7 +62,7 @@ export function SessionPage({ mode }: { mode: 'practice' | 'exam' }) {
         : `Тренировка · ${scenario ? scenario.title : 'вся поездка'}`;
 
   if (outcomes) {
-    const score = scoreSession(outcomes, app.speechOn);
+    const score = scoreSession(outcomes, speechOn);
     return (
       <SessionResult
         title={title}
@@ -96,7 +90,7 @@ export function SessionPage({ mode }: { mode: 'practice' | 'exam' }) {
       onFinish={(all) => {
         setOutcomes(all);
         if (mode === 'exam') {
-          const s = scoreSession(all, app.speechOn);
+          const s = scoreSession(all, speechOn);
           app.saveExam({
             at: Date.now(),
             scenarioId: scenario?.id ?? null,
@@ -104,6 +98,7 @@ export function SessionPage({ mode }: { mode: 'practice' | 'exam' }) {
             memory: s.memory,
             pronunciation: s.pronunciation,
             questions: all.length,
+            withPronunciation: speechOn,
           });
         }
       }}

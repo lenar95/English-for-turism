@@ -25,8 +25,8 @@ function ExamChart({ exams }: { exams: ExamRecord[] }) {
         const color = e.total >= 60 ? 'var(--good)' : 'var(--mid)';
         return (
           <g key={e.at}>
-            <rect x={pad + i * bw + bw * 0.18} y={h - bh + 2} width={bw * 0.64} height={bh} rx={4} fill={color}>
-              <title>{`${new Date(e.at).toLocaleDateString('ru-RU')}: ${e.total}%`}</title>
+            <rect x={pad + i * bw + bw * 0.18} y={h - bh + 2} width={bw * 0.64} height={bh} rx={4} fill={color} opacity={e.withPronunciation ? 1 : 0.5}>
+              <title>{`${new Date(e.at).toLocaleDateString('ru-RU')}: ${e.total}%${e.withPronunciation ? '' : ' (без микрофона)'}`}</title>
             </rect>
             <text x={pad + i * bw + bw / 2} y={h + 16} textAnchor="middle" fontSize="10" fill="var(--text-3)">
               {e.total}
@@ -39,7 +39,7 @@ function ExamChart({ exams }: { exams: ExamRecord[] }) {
 }
 
 export function ProgressPage() {
-  const { data, tripScenarios, speechOn } = useApp();
+  const { data, tripScenarios, speechOn, speechSupported } = useApp();
   const now = Date.now();
   const trip = tripReadiness(tripScenarios, data.progress, now, speechOn);
   const exams = [...data.exams].reverse();
@@ -50,7 +50,7 @@ export function ProgressPage() {
     streak: streak(data.activeDays, now),
     tripScenarios,
     now,
-    speechOn,
+    speechOn: speechSupported,
   })
     .filter((b) => b.kind === 'badge')
     .map((b) => ({ ...b, earned: b.earned || data.badges.includes(b.id) }))
@@ -145,7 +145,7 @@ export function ProgressPage() {
                       {new Date(e.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
                       <div className="tiny muted">{e.scenarioId ? scenarioById[e.scenarioId]?.title : 'Вся поездка'}</div>
                     </td>
-                    <td className="num small muted">🧠 {e.memory} · 🎙 {e.pronunciation ?? '—'}</td>
+                    <td className="num small muted">🧠 {e.memory} · 🎙 {e.withPronunciation ? (e.pronunciation ?? '—') : 'без микрофона'}</td>
                     <td className="num"><b>{e.total}%</b></td>
                   </tr>
                 ))}
@@ -163,7 +163,8 @@ export function ProgressPage() {
             фразы весят вдвое больше остальных.
           </p>
           <p>
-            <b>Память.</b> У каждой фразы есть уровень от 0 до 5. Верный ответ повышает его, ошибка — понижает на 2. Узнать
+            <b>Память.</b> У каждой фразы есть уровень от 0 до 5. Верный ответ повышает его, ошибка — понижает на 2 и назначает
+            повтор на следующий день. Узнать
             фразу среди вариантов проще, чем вспомнить самому, поэтому для фраз, которые нужно говорить, выбор из вариантов
             поднимает уровень максимум до 3 — дальше нужно собрать фразу или сказать её по памяти. Со временем фразы
             забываются: готовность снижается, если долго не повторять (кривая забывания, как в Anki).
@@ -182,7 +183,8 @@ export function ProgressPage() {
           </p>
           <p>
             <b>Проверка готовности</b> — это экзамен без подсказок: узнавание, понимание на слух, сборка фраз, чтение вслух и
-            ответ по памяти.
+            ответ по памяти. Проверки без микрофона считаются только по памяти и на графике показаны бледнее: с проверками
+            с микрофоном они не сравнимы.
           </p>
         </div>
       </details>

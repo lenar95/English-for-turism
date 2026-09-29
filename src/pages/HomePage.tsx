@@ -6,7 +6,7 @@ import { TodayPlan, WeekDots } from '../components/TodayPlan';
 import { stageStyle } from '../components/stage';
 import { cities, cityById } from '../data';
 import { daysUntil } from '../lib/dates';
-import { activeThisWeek, dailyPlan, readMotivation, rememberedShare } from '../lib/motivation';
+import { activeThisWeek, readMotivation, rememberedShare } from '../lib/motivation';
 import { pushSupport } from '../lib/push';
 import { scenarioReadiness, tripReadiness } from '../lib/readiness';
 import { useApp } from '../state/AppContext';
@@ -20,7 +20,7 @@ function greeting(now: number): string {
 }
 
 export function HomePage() {
-  const { data, tripScenarios, speechOn } = useApp();
+  const { data, tripScenarios, speechOn, plan, backend } = useApp();
   const now = Date.now();
   const trip = tripReadiness(tripScenarios, data.progress, now, speechOn);
   const perScenario = tripScenarios.map((s) => ({ s, r: scenarioReadiness(s, data.progress, now, speechOn) }));
@@ -28,7 +28,6 @@ export function HomePage() {
   const days = daysUntil(data.trip.date, now);
   const city = cityById[data.trip.cityId];
   const reading = readMotivation(data.answers, data.sessions, data.activeDays, now);
-  const plan = dailyPlan(tripScenarios, data.progress, data.answers, data.trip.date, reading, now);
   const week = activeThisWeek(data.activeDays, now);
   const can = tripScenarios.filter((s) => data.badges.includes(`can:${s.id}`));
 
@@ -54,7 +53,7 @@ export function HomePage() {
       <TodayPlan plan={plan} reading={reading} remembered={rememberedShare(tripScenarios, data.progress, now)} />
 
 
-      {data.answers.length > 0 && !data.settings.reminders && ['ok', 'ios-install'].includes(pushSupport()) && (
+      {data.answers.length > 0 && !data.settings.reminders && backend === 'ok' && ['ok', 'ios-install'].includes(pushSupport()) && (
         <Link to="/settings" className="banner" style={{ textDecoration: 'none', color: 'inherit' }}>
           <span aria-hidden style={{ fontSize: 22 }}>⏰</span>
           <span className="grow">
