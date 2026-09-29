@@ -31,7 +31,7 @@ export function PhraseCard({ phrase, context }: { phrase: Phrase; context?: stri
       <span className="phrase__en" lang="en">{phrase.en}</span>
       {app.data.settings.showTranscription && <span className="phrase__tr">{phrase.tr}</span>}
       <span className="phrase__ru">{phrase.ru}</span>
-      {local && <LocalLine local={local} />}
+      {local && <LocalLine local={local} phraseId={phrase.id} canSpeak={canSpeak} />}
       {phrase.note && <p className="phrase__note">💡 {phrase.note}</p>}
       <div className="phrase__actions">
         <SpeakButtons text={phrase.en} />

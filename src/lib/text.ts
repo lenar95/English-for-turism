@@ -144,3 +144,58 @@ export function wordSimilarity(a: string, b: string): number {
   if (!max) return 1;
   return 1 - levenshtein(a, b) / max;
 }
+
+const TR_DIGITS = ['', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz'];
+const TR_TENS = ['', 'on', 'yirmi', 'otuz', 'kırk', 'elli', 'altmış', 'yetmiş', 'seksen', 'doksan'];
+
+/** Число до 9999 турецкими словами: 500 → «beş yüz», 40 → «kırk». */
+function turkishNumber(n: number): string[] {
+  if (n === 0) return ['sıfır'];
+  const out: string[] = [];
+  const th = Math.floor(n / 1000);
+  const h = Math.floor((n % 1000) / 100);
+  const rest = n % 100;
+  if (th) out.push(...(th > 1 ? [TR_DIGITS[th]] : []), 'bin');
+  if (h) out.push(...(h > 1 ? [TR_DIGITS[h]] : []), 'yüz');
+  if (rest >= 10) out.push(TR_TENS[Math.floor(rest / 10)]);
+  if (rest % 10) out.push(TR_DIGITS[rest % 10]);
+  return out;
+}
+
+/**
+ * Разбить турецкий текст на нормализованные слова.
+ * Регистр — по турецким правилам (İ → i, I → ı); апостроф перед окончанием
+ * убираем («Kadıköy'e» = «Kadıköye»), цифры переводим в слова.
+ * Буквы с точками и седилями приводим к базовым: распознаватель иногда их теряет,
+ * а для понимания собеседником это почти не важно.
+ */
+export function tokenizeTurkish(text: string): string[] {
+  const t = text
+    .toLocaleLowerCase('tr-TR')
+    .replace(/[’‘`´']/g, '')
+    .replace(/[“”«»"]/g, ' ')
+    .replace(/(\p{L})(\d)/gu, '$1 $2');
+  const words: string[] = [];
+  for (const raw of t.split(/[\s,.!?;:()/-]+/)) {
+    if (!raw) continue;
+    if (/^\d{1,4}$/.test(raw)) {
+      words.push(...turkishNumber(Number(raw)).map(foldTurkish));
+      continue;
+    }
+    words.push(foldTurkish(raw));
+  }
+  return words;
+}
+
+function foldTurkish(w: string): string {
+  return w
+    .replace(/ı/g, 'i')
+    .replace(/ş/g, 's')
+    .replace(/ç/g, 'c')
+    .replace(/ğ/g, 'g')
+    .replace(/ö/g, 'o')
+    .replace(/ü/g, 'u')
+    .replace(/â/g, 'a')
+    .replace(/î/g, 'i')
+    .replace(/û/g, 'u');
+}

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { TabBar } from './components/Layout';
 import { Toasts } from './components/Toasts';
+import { LocalPracticePage } from './pages/LocalPracticePage';
 import { CityPage } from './pages/CityPage';
 import { DialoguePage } from './pages/DialoguePage';
 import { HomePage } from './pages/HomePage';
@@ -26,7 +27,7 @@ function Shell() {
   if (!ready) return null;
   if (!data.onboarded) return <OnboardingPage />;
   // В упражнениях и диалогах панель вкладок не показываем, чтобы не отвлекала.
-  const focused = /^\/(practice|exam)\//.test(pathname) || pathname.includes('/dialogue/');
+  const focused = /^\/(practice|exam)\//.test(pathname) || pathname.includes('/dialogue/') || /^\/city\/[^/]+\/local/.test(pathname);
   return (
     <>
       <ScrollToTop />
@@ -35,6 +36,7 @@ function Shell() {
         <Route path="/scenarios" element={<ScenariosPage />} />
         <Route path="/scenario/:id" element={<ScenarioPage />} />
         <Route path="/city/:id" element={<CityPage />} />
+        <Route path="/city/:id/local" element={<LocalPracticePage />} />
         <Route path="/scenario/:id/dialogue/:did" element={<DialoguePage />} />
         <Route path="/practice/:scope" element={<SessionPage key="practice" mode="practice" />} />
         <Route path="/exam/:scope" element={<SessionPage key="exam" mode="exam" />} />

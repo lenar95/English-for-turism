@@ -5,7 +5,7 @@ import { TopBar } from '../components/Layout';
 import { PhraseCard } from '../components/PhraseCard';
 import { Metric, Ring } from '../components/Readiness';
 import { stageStyle } from '../components/stage';
-import { scenarioById } from '../data';
+import { cityById, scenarioById } from '../data';
 import { scenarioReadiness } from '../lib/readiness';
 import { useApp } from '../state/AppContext';
 
@@ -16,6 +16,7 @@ export function ScenarioPage() {
   const { data, speechOn } = useApp();
   const [filter, setFilter] = useState<Filter>('all');
   const scenario = scenarioById[id];
+  const city = scenario?.cityId ? cityById[scenario.cityId] : undefined;
   if (!scenario) {
     return (
       <div className="page">
@@ -64,6 +65,11 @@ export function ScenarioPage() {
             <IconTarget /> Проверка
           </Link>
         </div>
+        {city && scenario.phrases.some((p) => p.local) && (
+          <Link to={`/city/${city.id}/local?s=${scenario.id}`} className="btn btn--outline btn--block">
+            {city.emoji} Тренировка {city.localLanguage.name}
+          </Link>
+        )}
       </section>
 
       {scenario.dialogues.length > 1 && (

@@ -17,11 +17,13 @@ interface Props {
   compact?: boolean;
   idleHint?: string;
   disabled?: boolean;
+  /** Язык фразы (BCP 47). По умолчанию английский. */
+  lang?: string;
 }
 
 type Status = 'idle' | 'listening' | 'processing' | 'done' | 'error';
 
-export function PronunciationCheck({ targets, onResult, showWords = true, compact, idleHint, disabled }: Props) {
+export function PronunciationCheck({ targets, onResult, showWords = true, compact, idleHint, disabled, lang = 'en-US' }: Props) {
   const { speechSupported, data } = useApp();
   const [status, setStatus] = useState<Status>('idle');
   const [partial, setPartial] = useState('');
@@ -56,12 +58,12 @@ export function PronunciationCheck({ targets, onResult, showWords = true, compac
     setPartial('');
     setResult(null);
     setStatus('listening');
-    const s = listen({ lang: 'en-US', onPartial: setPartial });
+    const s = listen({ lang, onPartial: setPartial });
     session.current = s;
     s.result
       .then((alts) => {
         setStatus('processing');
-        const r = scorePronunciation(targets, alts);
+        const r = scorePronunciation(targets, alts, lang.startsWith('tr') ? 'tr' : 'en');
         setResult(r);
         setStatus('done');
         if (r.score >= 85) hapticSuccess();

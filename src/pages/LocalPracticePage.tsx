@@ -1,0 +1,283 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Burst } from '../components/Burst';
+import { IconClose } from '../components/Icons';
+import { TopBar } from '../components/Layout';
+import { PronunciationCheck } from '../components/PronunciationCheck';
+import { Ring } from '../components/Readiness';
+import { SpeakButtons } from '../components/Speak';
+import { cityById } from '../data';
+import type { CityPack } from '../data/types';
+import { RECALL_PASS_SCORE } from '../lib/exercises';
+import { hapticSuccess } from '../lib/haptics';
+import { localLearned, localProgressKey, localSession, type LocalItem } from '../lib/localPractice';
+import type { PronunciationResult } from '../lib/pronunciation';
+import { useApp } from '../state/AppContext';
+
+const SESSION_SIZE = 8;
+
+interface LocalOutcome {
+  item: LocalItem;
+  /** Сказал (или вспомнил) без подсказки и достаточно понятно. */
+  ok: boolean;
+  /**
+   * Вспомнил ли для модели памяти. null — вспомнил только с подсказкой:
+   * память не трогаем (ни повышаем, ни наказываем), засчитываем только произношение.
+   */
+  memory: boolean | null;
+  pronScore?: number;
+}
+
+/** Тренировка фраз города на местном языке: повторить за диктором, потом вспомнить самому. */
+export function LocalPracticePage() {
+  const { id = '' } = useParams();
+  const [search] = useSearchParams();
+  const city = cityById[id];
+  const [round, setRound] = useState(0);
+  if (!city) {
+    return (
+      <div className="page">
+        <TopBar back="/scenarios" />
+        <p className="empty">Город не найден.</p>
+      </div>
+    );
+  }
+  return <LocalRun key={round} city={city} scenarioId={search.get('s') ?? undefined} onRestart={() => setRound((r) => r + 1)} />;
+}
+
+function LocalRun({ city, scenarioId, onRestart }: { city: CityPack; scenarioId?: string; onRestart: () => void }) {
+  const app = useApp();
+  const navigate = useNavigate();
+  const back = scenarioId ? `/scenario/${scenarioId}` : `/city/${city.id}`;
+  // Набор фиксируется на раунд, чтобы не перестраиваться после каждого ответа.
+  const items = useMemo(
+    () => localSession(city, app.data.progress, SESSION_SIZE, scenarioId),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [city.id, scenarioId, app.ready],
+  );
+  const [outcomes, setOutcomes] = useState<LocalOutcome[]>([]);
+  const [current, setCurrent] = useState<LocalOutcome | null>(null);
+  const startedAt = useRef(Date.now());
+  const index = outcomes.length;
+  const item = items[index];
+  const lang = city.localLanguage;
+
+  const log = (all: LocalOutcome[], exitedEarly: boolean) => {
+    if (!all.length && exitedEarly) return;
+    app.logSession({
+      start: startedAt.current,
+      end: Date.now(),
+      kind: 'practice',
+      planned: items.length,
+      done: all.length,
+      correct: all.filter((o) => o.ok).length,
+      exitedEarly,
+    });
+  };
+
+  const next = () => {
+    if (!current) return;
+    const key = localProgressKey(current.item.phrase.id);
+    if (current.memory !== null) app.answer(key, current.memory, current.item.mode === 'recall' ? 'recall' : 'recognition');
+    if (current.pronScore !== undefined) app.pronunciation(key, current.pronScore);
+    const all = [...outcomes, current];
+    setOutcomes(all);
+    setCurrent(null);
+    if (all.length >= items.length) log(all, false);
+  };
+
+  const exit = () => {
+    log(outcomes, true);
+    navigate(back);
+  };
+
+  if (!items.length) {
+    return (
+      <div className="page">
+        <TopBar back={back} title={`Тренировка ${lang.name}`} />
+        <p className="empty">Здесь пока нет фраз для тренировки.</p>
+      </div>
+    );
+  }
+
+  if (!item) return <LocalResult city={city} outcomes={outcomes} back={back} onRestart={onRestart} />;
+
+  return (
+    <div className="arena arena--city">
+      <div className="page page--bare" style={{ minHeight: '100dvh' }}>
+        <div className="row">
+          <button type="button" className="icon-btn icon-btn--plain" onClick={exit} aria-label="Выйти">
+            <IconClose />
+          </button>
+          <div className="progress-dots grow" aria-label={`Фраза ${index + 1} из ${items.length}`}>
+            {items.map((_, i) => (
+              <span key={i} className={i < index ? 'done' : i === index ? 'current' : ''} />
+            ))}
+          </div>
+          <span className="small muted" style={{ minWidth: 44, textAlign: 'right' }}>
+            {index + 1}/{items.length}
+          </span>
+        </div>
+
+        <LocalCard key={`${item.phrase.id}-${index}`} item={item} lang={lang.lang} name={lang.name} speechOn={app.speechOn} onAnswered={setCurrent} />
+
+        <div className="sticky-footer">
+          <button type="button" className="btn btn--block" disabled={!current} onClick={next}>
+            {index + 1 >= items.length ? 'Посмотреть результат' : 'Дальше'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LocalCard({
+  item,
+  lang,
+  name,
+  speechOn,
+  onAnswered,
+}: {
+  item: LocalItem;
+  lang: string;
+  name: string;
+  speechOn: boolean;
+  onAnswered: (o: LocalOutcome | null) => void;
+}) {
+  const { phrase } = item;
+  const local = phrase.local!;
+  const recall = item.mode === 'recall';
+  // Подсказки в режиме «вспомнить»: 1 — произношение русскими буквами, 2 — вся фраза с озвучкой.
+  const [hint, setHint] = useState(recall ? 0 : 2);
+  const [result, setResult] = useState<PronunciationResult | null>(null);
+  const [selfCheck, setSelfCheck] = useState(false);
+  const passed = result !== null && result.score >= RECALL_PASS_SCORE;
+  const usedHint = recall && hint > 0;
+
+  const onResult = (r: PronunciationResult) => {
+    // Засчитываем лучшую попытку.
+    const best = result && result.score > r.score ? result : r;
+    setResult(best);
+    const said = best.score >= RECALL_PASS_SCORE;
+    onAnswered({ item, ok: said && !usedHint, memory: said && usedHint ? null : said, pronScore: best.score });
+  };
+
+  const selfAnswer = (ok: boolean) => {
+    setSelfCheck(true);
+    setHint(2);
+    onAnswered({ item, ok: ok && !usedHint, memory: ok && usedHint ? null : ok });
+  };
+
+  return (
+    <div className="exercise">
+      <span className="exercise__kind">{recall ? `Скажите ${name}` : 'Послушайте и повторите'}</span>
+      <div className="card phrase">
+        <span className="exercise__prompt">{phrase.ru}</span>
+        {hint >= 1 && <span className="phrase__tr">{local.tr}</span>}
+        {hint >= 2 && (
+          <span className="phrase__en" lang={lang.slice(0, 2)} style={{ fontSize: 22 }}>
+            {local.text}
+          </span>
+        )}
+        {hint >= 2 && (
+          <div className="phrase__actions">
+            <SpeakButtons text={local.text} lang={lang} autoPlay={!recall} />
+            {!recall && <span className="small muted">Сначала послушайте, как это звучит</span>}
+          </div>
+        )}
+        <span className="small muted" lang="en">
+          По-английски: {phrase.en}
+        </span>
+      </div>
+
+      {speechOn ? (
+        <PronunciationCheck
+          targets={[local.text]}
+          lang={lang}
+          onResult={onResult}
+          showWords={hint >= 2 || passed}
+          idleHint={recall && hint < 2 ? `Вспомните и скажите ${name}` : `Нажмите на микрофон и повторите ${name}`}
+        />
+      ) : !selfCheck ? (
+        <div className="row">
+          {recall ? (
+            <>
+              <button type="button" className="btn btn--outline grow" onClick={() => selfAnswer(false)}>
+                Не вспомнил
+              </button>
+              <button type="button" className="btn grow" onClick={() => selfAnswer(true)}>
+                Вспомнил
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn btn--secondary grow" onClick={() => selfAnswer(true)}>
+              Повторил вслух
+            </button>
+          )}
+        </div>
+      ) : null}
+
+      {recall && hint < 2 && !passed && (
+        <button type="button" className="btn btn--ghost" onClick={() => setHint(hint + 1)}>
+          {hint === 0 ? 'Подсказка' : 'Показать фразу'}
+        </button>
+      )}
+      {result && !passed && (
+        <p className="small muted center">
+          Пока не похоже. Послушайте ещё раз и повторите — можно несколько попыток.
+          {hint < 2 && ' Или возьмите подсказку.'}
+        </p>
+      )}
+      {speechOn && !result && (
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          style={{ alignSelf: 'center' }}
+          onClick={() => {
+            setHint(2);
+            onAnswered({ item, ok: false, memory: false });
+          }}
+        >
+          Пропустить
+        </button>
+      )}
+    </div>
+  );
+}
+
+function LocalResult({ city, outcomes, back, onRestart }: { city: CityPack; outcomes: LocalOutcome[]; back: string; onRestart: () => void }) {
+  const { data } = useApp();
+  const ok = outcomes.filter((o) => o.ok).length;
+  const scores = outcomes.map((o) => o.pronScore).filter((s): s is number => s !== undefined);
+  const pron = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+  const { started, learned, total } = localLearned(city, data.progress);
+  const good = outcomes.length > 0 && ok / outcomes.length >= 0.7;
+  // Вибрация один раз при удачном итоге.
+  useEffect(() => {
+    if (good) hapticSuccess();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="page">
+      <TopBar back={back} title={`Тренировка ${city.localLanguage.name}`} />
+      <div className="card stack pop" style={{ alignItems: 'center', position: 'relative' }}>
+        {good && <Burst count={20} />}
+        <h2>{good ? 'Çok iyi! Отлично!' : 'Хорошее начало'}</h2>
+        <Ring value={pron ?? Math.round((ok / Math.max(1, outcomes.length)) * 100)} size={120} label={pron === null ? 'результат' : 'произношение'} />
+        <p className="center">
+          Сказали сами: <b>{ok}</b> из {outcomes.length}
+        </p>
+        <p className="small muted center">
+          Разучено {city.localLanguage.name}: {started} из {total} фраз{learned > 0 ? `, из них освоено ${learned}` : ''}. Через день-два
+          тренировка попросит вспомнить их без подсказки — так они запомнятся надёжнее.
+        </p>
+        <button type="button" className="btn btn--block" onClick={onRestart}>
+          Ещё 8 фраз
+        </button>
+        <Link className="btn btn--ghost btn--block" to={back}>
+          Готово
+        </Link>
+      </div>
+    </div>
+  );
+}

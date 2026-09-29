@@ -3,7 +3,7 @@ import { IconSearch } from '../components/Icons';
 import { PhraseCard } from '../components/PhraseCard';
 import { allPhrases, allScenarios } from '../data';
 
-const norm = (s: string) => s.toLowerCase().replace(/ё/g, 'е').replace(/[’']/g, "'");
+const norm = (s: string) => s.toLocaleLowerCase('tr-TR').replace(/ı/g, 'i').toLowerCase().replace(/ё/g, 'е').replace(/[’']/g, "'");
 
 export function PhrasebookPage() {
   const [q, setQ] = useState('');
@@ -16,7 +16,7 @@ export function PhrasebookPage() {
       if (scenarioId && scenario.id !== scenarioId) return false;
       if (keyOnly && !phrase.key) return false;
       if (!query) return true;
-      return [phrase.en, phrase.ru, phrase.tr, ...(phrase.alt ?? [])].some((t) => norm(t).includes(query));
+      return [phrase.en, phrase.ru, phrase.tr, ...(phrase.alt ?? []), phrase.local?.text ?? '', phrase.local?.tr ?? ''].some((t) => norm(t).includes(query));
     });
   }, [q, scenarioId, keyOnly]);
 

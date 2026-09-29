@@ -5,6 +5,7 @@ import { Ring } from '../components/Readiness';
 import { ScenarioItem } from '../components/ScenarioItem';
 import { SpeakButtons } from '../components/Speak';
 import { cityById } from '../data';
+import { localLearned } from '../lib/localPractice';
 import { scenarioReadiness, tripReadiness } from '../lib/readiness';
 import { useApp } from '../state/AppContext';
 
@@ -24,6 +25,7 @@ export function CityPage() {
   const selected = data.trip.cityId === city.id;
   const r = tripReadiness(city.scenarios, data.progress, now, speechOn);
   const { localLanguage: lang } = city;
+  const local = localLearned(city, data.progress);
 
   return (
     <div className="page">
@@ -68,6 +70,13 @@ export function CityPage() {
       <section className="card stack">
         <h3>Пара слов {lang.name}</h3>
         <p className="small muted">{lang.note}</p>
+        <Link to={`/city/${city.id}/local`} className="btn btn--block">
+          <IconPlay /> Тренировка {lang.name}
+        </Link>
+        <p className="small muted">
+          Все фразы города есть и {lang.name}: повторяйте за диктором, а потом говорите сами — микрофон проверит произношение.
+          {local.started > 0 && ` Разучено: ${local.started} из ${local.total}.`}
+        </p>
         <div className="stack stack--sm">
           {lang.words.map((w) => (
             <div key={w.text} className="row" style={{ gap: 10 }}>

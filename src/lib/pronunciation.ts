@@ -1,4 +1,9 @@
-import { tokenize, wordSimilarity } from './text';
+import { tokenize, tokenizeTurkish, wordSimilarity } from './text';
+
+/** Язык фразы: английский (по умолчанию) или турецкий. */
+export type ScoreLang = 'en' | 'tr';
+
+const tokenizerFor = (lang: ScoreLang) => (lang === 'tr' ? tokenizeTurkish : tokenize);
 
 /**
  * Оценка произношения.
@@ -37,19 +42,19 @@ const CLOSE_THRESHOLD = 0.5;
 const OK_THRESHOLD = 0.85;
 
 /** Слова эталона вместе с «видимыми» исходными словами для подсветки. */
-function targetWords(target: string): { norm: string; display: string }[] {
+function targetWords(target: string, lang: ScoreLang): { norm: string; display: string }[] {
   const display = target.split(/\s+/).filter(Boolean);
   const out: { norm: string; display: string }[] = [];
   for (const d of display) {
-    const parts = tokenize(d);
+    const parts = tokenizerFor(lang)(d);
     // «I’m» разворачивается в два нормализованных слова, но подсвечивается одно.
     parts.forEach((norm, i) => out.push({ norm, display: i === 0 ? d : '' }));
   }
   return out;
 }
 
-function weight(word: string): number {
-  return LIGHT_WORDS.has(word) ? 0.5 : 1;
+function weight(word: string, lang: ScoreLang): number {
+  return lang === 'en' && LIGHT_WORDS.has(word) ? 0.5 : 1;
 }
 
 function credit(sim: number): number {
@@ -66,7 +71,7 @@ interface Alignment {
 }
 
 /** Выравнивание по словам: максимизируем набранный балл (вариант алгоритма Нидлмана — Вунша). */
-function align(target: string[], heard: string[]): Alignment {
+function align(target: string[], heard: string[], lang: ScoreLang): Alignment {
   const n = target.length;
   const m = heard.length;
   // dp[i][j] — лучший балл для первых i слов эталона и j слов распознанного текста.
@@ -79,7 +84,7 @@ function align(target: string[], heard: string[]): Alignment {
   for (let i = 1; i <= n; i++) {
     dp[i][0] = dp[i - 1][0];
     move[i][0] = 1;
-    const w = weight(target[i - 1]);
+    const w = weight(target[i - 1], lang);
     for (let j = 1; j <= m; j++) {
       const sim = wordSimilarity(target[i - 1], heard[j - 1]);
       const diag = dp[i - 1][j - 1] + credit(sim) * w;
@@ -119,12 +124,12 @@ function align(target: string[], heard: string[]): Alignment {
   return { gained: dp[n][m] + extra * EXTRA_WORD_PENALTY, extra, heardFor, sims };
 }
 
-function scoreOne(target: string, transcript: string): PronunciationResult {
-  const tw = targetWords(target);
-  const heard = tokenize(transcript);
+function scoreOne(target: string, transcript: string, lang: ScoreLang): PronunciationResult {
+  const tw = targetWords(target, lang);
+  const heard = tokenizerFor(lang)(transcript);
   const norms = tw.map((t) => t.norm);
-  const total = norms.reduce((s, w) => s + weight(w), 0) || 1;
-  const a = align(norms, heard);
+  const total = norms.reduce((s, w) => s + weight(w, lang), 0) || 1;
+  const a = align(norms, heard, lang);
   // Лишние слова штрафуем умеренно: распознаватель иногда добавляет «um», «the».
   const penalty = Math.min(a.extra * EXTRA_WORD_PENALTY, total * 0.3);
   const raw = (a.gained - penalty) / total;
@@ -150,17 +155,18 @@ function scoreOne(target: string, transcript: string): PronunciationResult {
  * Оценить сказанное.
  * @param targets допустимые варианты фразы (первый — основной).
  * @param transcripts гипотезы распознавателя (обычно до 5 вариантов).
+ * @param lang язык фразы.
  */
-export function scorePronunciation(targets: string[], transcripts: string[]): PronunciationResult {
+export function scorePronunciation(targets: string[], transcripts: string[], lang: ScoreLang = 'en'): PronunciationResult {
   const cleanTranscripts = transcripts.map((t) => t.trim()).filter(Boolean);
   if (!cleanTranscripts.length) {
-    const r = scoreOne(targets[0], '');
+    const r = scoreOne(targets[0], '', lang);
     return { ...r, transcript: '' };
   }
   let best: PronunciationResult | null = null;
   for (const target of targets) {
     for (const tr of cleanTranscripts) {
-      const r = scoreOne(target, tr);
+      const r = scoreOne(target, tr, lang);
       if (!best || r.score > best.score) best = r;
     }
   }
