@@ -1,19 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Burst } from '../components/Burst';
-import { IconClose } from '../components/Icons';
 import { TopBar } from '../components/Layout';
 import { PronunciationCheck } from '../components/PronunciationCheck';
 import { Ring } from '../components/Readiness';
+import { SessionFrame } from '../components/SessionFrame';
 import { SpeakButtons } from '../components/Speak';
 import { cityById } from '../data';
 import type { CityPack } from '../data/types';
-import { RECALL_PASS_SCORE } from '../lib/exercises';
+import { RECALL_PASS_SCORE } from '../lib/thresholds';
 import { hapticSuccess } from '../lib/haptics';
 import { localLearned, localProgressKey, localSession, type LocalItem } from '../lib/localPractice';
 import type { PronunciationResult } from '../lib/pronunciation';
 import { plural } from '../lib/ru';
-import { useApp } from '../state/AppContext';
+import { useActions, useAppData, useSettings } from '../state/AppContext';
+import { useSessionLog } from '../state/useSessionLog';
 
 const SESSION_SIZE = 8;
 
@@ -47,48 +48,37 @@ export function LocalPracticePage() {
 }
 
 function LocalRun({ city, scenarioId, onRestart }: { city: CityPack; scenarioId?: string; onRestart: () => void }) {
-  const app = useApp();
+  const { data, ready } = useAppData();
+  const { speechOn } = useSettings();
+  const { answer, pronunciation } = useActions();
   const navigate = useNavigate();
   const back = scenarioId ? `/scenario/${scenarioId}` : `/city/${city.id}`;
   // Набор фиксируется на раунд, чтобы не перестраиваться после каждого ответа.
   const items = useMemo(
-    () => localSession(city, app.data.progress, SESSION_SIZE, scenarioId),
+    () => localSession(city, data.progress, SESSION_SIZE, scenarioId),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [city.id, scenarioId, app.ready],
+    [city.id, scenarioId, ready],
   );
   const [outcomes, setOutcomes] = useState<LocalOutcome[]>([]);
   const [current, setCurrent] = useState<LocalOutcome | null>(null);
-  const startedAt = useRef(Date.now());
   const index = outcomes.length;
   const item = items[index];
   const lang = city.localLanguage;
-
-  const log = (all: LocalOutcome[], exitedEarly: boolean) => {
-    if (!all.length && exitedEarly) return;
-    app.logSession({
-      start: startedAt.current,
-      end: Date.now(),
-      kind: 'practice',
-      planned: items.length,
-      done: all.length,
-      correct: all.filter((o) => o.ok).length,
-      exitedEarly,
-    });
-  };
+  const session = useSessionLog('practice', items.length, { done: index, correct: outcomes.filter((o) => o.ok).length });
 
   const next = () => {
     if (!current) return;
     const key = localProgressKey(current.item.phrase.id);
-    if (current.memory !== null) app.answer(key, current.memory, current.item.mode === 'recall' ? 'recall' : 'recognition');
-    if (current.pronScore !== undefined) app.pronunciation(key, current.pronScore);
+    if (current.memory !== null) answer(key, current.memory, current.item.mode === 'recall' ? 'recall' : 'recognition');
+    if (current.pronScore !== undefined) pronunciation(key, current.pronScore);
     const all = [...outcomes, current];
     setOutcomes(all);
     setCurrent(null);
-    if (all.length >= items.length) log(all, false);
+    if (all.length >= items.length) session.finish({ done: all.length, correct: all.filter((o) => o.ok).length });
   };
 
   const exit = () => {
-    log(outcomes, true);
+    session.exit();
     navigate(back);
   };
 
@@ -104,31 +94,20 @@ function LocalRun({ city, scenarioId, onRestart }: { city: CityPack; scenarioId?
   if (!item) return <LocalResult city={city} outcomes={outcomes} back={back} onRestart={onRestart} />;
 
   return (
-    <div className="arena arena--city">
-      <div className="page page--bare" style={{ minHeight: '100dvh' }}>
-        <div className="row">
-          <button type="button" className="icon-btn icon-btn--plain" onClick={exit} aria-label="Выйти">
-            <IconClose />
-          </button>
-          <div className="progress-dots grow" aria-label={`Фраза ${index + 1} из ${items.length}`}>
-            {items.map((_, i) => (
-              <span key={i} className={i < index ? 'done' : i === index ? 'current' : ''} />
-            ))}
-          </div>
-          <span className="small muted" style={{ minWidth: 44, textAlign: 'right' }}>
-            {index + 1}/{items.length}
-          </span>
-        </div>
-
-        <LocalCard key={`${item.phrase.id}-${index}`} item={item} lang={lang.lang} name={lang.name} speechOn={app.speechOn} onAnswered={setCurrent} />
-
-        <div className="sticky-footer">
-          <button type="button" className="btn btn--block" disabled={!current} onClick={next}>
-            {index + 1 >= items.length ? 'Посмотреть результат' : 'Дальше'}
-          </button>
-        </div>
-      </div>
-    </div>
+    <SessionFrame
+      arena="city"
+      index={index}
+      planned={items.length}
+      unit="Фраза"
+      onExit={exit}
+      footer={
+        <button type="button" className="btn btn--block" disabled={!current} onClick={next}>
+          {index + 1 >= items.length ? 'Посмотреть результат' : 'Дальше'}
+        </button>
+      }
+    >
+      <LocalCard key={`${item.phrase.id}-${index}`} item={item} lang={lang.lang} name={lang.name} speechOn={speechOn} onAnswered={setCurrent} />
+    </SessionFrame>
   );
 }
 
@@ -247,7 +226,7 @@ function LocalCard({
 }
 
 function LocalResult({ city, outcomes, back, onRestart }: { city: CityPack; outcomes: LocalOutcome[]; back: string; onRestart: () => void }) {
-  const { data } = useApp();
+  const { data } = useAppData();
   const ok = outcomes.filter((o) => o.ok).length;
   const scores = outcomes.map((o) => o.pronScore).filter((s): s is number => s !== undefined);
   const pron = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;

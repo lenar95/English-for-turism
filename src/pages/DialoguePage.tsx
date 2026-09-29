@@ -8,9 +8,10 @@ import { Metric, Ring } from '../components/Readiness';
 import { SpeakButtons } from '../components/Speak';
 import { phraseById, scenarioById } from '../data';
 import type { Phrase } from '../data/types';
-import { RECALL_PASS_SCORE } from '../lib/exercises';
+import { RECALL_PASS_SCORE } from '../lib/thresholds';
 import type { PronunciationResult } from '../lib/pronunciation';
-import { useApp } from '../state/AppContext';
+import { useActions, useSettings } from '../state/AppContext';
+import { useSessionLog } from '../state/useSessionLog';
 
 interface LineResult {
   phrase: Phrase;
@@ -21,7 +22,7 @@ interface LineResult {
 
 export function DialoguePage() {
   const { id = '', did = '' } = useParams();
-  const app = useApp();
+  const { speechOn } = useSettings();
   const scenario = scenarioById[id];
   const dialogue = scenario?.dialogues.find((d) => d.id === did);
   const [round, setRound] = useState(0);
@@ -45,7 +46,7 @@ export function DialoguePage() {
       <DialogueRun
         key={`${dialogue.id}-${round}`}
         lines={lines}
-        speechOn={app.speechOn}
+        speechOn={speechOn}
         onRestart={() => setRound((r) => r + 1)}
         footer={
           <>
@@ -76,53 +77,38 @@ function DialogueRun({
   onRestart: () => void;
   footer: React.ReactNode;
 }) {
-  const app = useApp();
+  const { answer, pronunciation } = useActions();
+  const { settings } = useSettings();
+  const showTr = settings.showTranscription;
   const [step, setStep] = useState(0);
   const [results, setResults] = useState<LineResult[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
-  const startedAt = useRef(Date.now());
-  const logged = useRef(false);
   const current = lines[step];
   const finished = step >= lines.length;
+
+  const yourLines = results.filter((r) => r.phrase.speaker === 'you');
+  const recalled = yourLines.filter((r) => r.recalled).length;
+  // В журнале сессии считаются только реплики пользователя; уход со страницы посреди диалога — досрочный выход.
+  const session = useSessionLog('dialogue', lines.filter((l) => l.speaker === 'you').length, { done: yourLines.length, correct: recalled });
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [step]);
 
-  const logDialogue = (all: LineResult[], exitedEarly: boolean) => {
-    if (logged.current) return;
-    const mine = all.filter((x) => x.phrase.speaker === 'you');
-    if (exitedEarly && !mine.length) return;
-    logged.current = true;
-    app.logSession({
-      start: startedAt.current,
-      end: Date.now(),
-      kind: 'dialogue',
-      planned: lines.filter((l) => l.speaker === 'you').length,
-      done: mine.length,
-      correct: mine.filter((x) => x.recalled).length,
-      exitedEarly,
-    });
-  };
-
-  // Ушёл со страницы посреди диалога — это досрочный выход.
-  const resultsRef = useRef<LineResult[]>([]);
-  useEffect(() => () => logDialogue(resultsRef.current, true), []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const complete = (r: LineResult) => {
     if (r.phrase.speaker === 'you') {
-      if (r.recalled !== undefined) app.answer(r.phrase.id, r.recalled, 'recall');
-      if (r.pronScore !== undefined) app.pronunciation(r.phrase.id, r.pronScore);
+      if (r.recalled !== undefined) answer(r.phrase.id, r.recalled, 'recall');
+      if (r.pronScore !== undefined) pronunciation(r.phrase.id, r.pronScore);
     }
     const all = [...results, r];
-    resultsRef.current = all;
     setResults(all);
     setStep((s) => s + 1);
-    if (step + 1 >= lines.length) logDialogue(all, false);
+    if (step + 1 >= lines.length) {
+      const mine = all.filter((x) => x.phrase.speaker === 'you');
+      session.finish({ done: mine.length, correct: mine.filter((x) => x.recalled).length });
+    }
   };
 
-  const yourLines = results.filter((r) => r.phrase.speaker === 'you');
-  const recalled = yourLines.filter((r) => r.recalled).length;
   const pronScores = yourLines.map((r) => r.pronScore).filter((s): s is number => s !== undefined);
   const memory = yourLines.length ? Math.round((recalled / yourLines.length) * 100) : 0;
   const pron = pronScores.length ? Math.round(pronScores.reduce((a, b) => a + b, 0) / pronScores.length) : null;
@@ -139,13 +125,13 @@ function DialogueRun({
 
       <div className="chat">
         {results.map((r, i) => (
-          <Bubble key={i} phrase={r.phrase} score={r.pronScore} showTr={app.data.settings.showTranscription} />
+          <Bubble key={i} phrase={r.phrase} score={r.pronScore} showTr={showTr} />
         ))}
         {!finished && current.speaker === 'them' && (
-          <TheirTurn key={step} phrase={current} showTr={app.data.settings.showTranscription} onNext={() => complete({ phrase: current })} />
+          <TheirTurn key={step} phrase={current} showTr={showTr} onNext={() => complete({ phrase: current })} />
         )}
         {!finished && current.speaker === 'you' && (
-          <YourTurn key={step} phrase={current} speechOn={speechOn} showTr={app.data.settings.showTranscription} onDone={complete} />
+          <YourTurn key={step} phrase={current} speechOn={speechOn} showTr={showTr} onDone={complete} />
         )}
       </div>
 

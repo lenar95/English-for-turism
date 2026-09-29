@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom';
 import { Ring } from '../components/Readiness';
 import { scenarioById } from '../data';
-import { scenarioReadiness, tripReadiness, MEMORY_WEIGHT } from '../lib/readiness';
+import { scenarioReadiness, MEMORY_WEIGHT } from '../lib/readiness';
+import { READY_OK } from '../lib/thresholds';
 import { LearningHealth } from '../components/LearningHealth';
 import { allBadges } from '../lib/badges';
-import { readMotivation } from '../lib/motivation';
 import { useApp } from '../state/AppContext';
+import { useMotivation, useReadiness } from '../state/selectors';
+import { useNow } from '../state/useNow';
 import { streak } from '../state/model';
 import type { ExamRecord } from '../state/model';
 
@@ -22,7 +24,7 @@ function ExamChart({ exams }: { exams: ExamRecord[] }) {
       ))}
       {list.map((e, i) => {
         const bh = Math.max(3, (e.total / 100) * (h - 4));
-        const color = e.total >= 60 ? 'var(--good)' : 'var(--mid)';
+        const color = e.total >= READY_OK ? 'var(--good)' : 'var(--mid)';
         return (
           <g key={e.at}>
             <rect x={pad + i * bw + bw * 0.18} y={h - bh + 2} width={bw * 0.64} height={bh} rx={4} fill={color} opacity={e.withPronunciation ? 1 : 0.5}>
@@ -40,8 +42,9 @@ function ExamChart({ exams }: { exams: ExamRecord[] }) {
 
 export function ProgressPage() {
   const { data, tripScenarios, speechOn, speechSupported } = useApp();
-  const now = Date.now();
-  const trip = tripReadiness(tripScenarios, data.progress, now, speechOn);
+  const now = useNow();
+  const reading = useMotivation();
+  const trip = useReadiness();
   const exams = [...data.exams].reverse();
   // Значок, однажды полученный, остаётся, даже если готовность потом снизилась.
   const badges = allBadges({
@@ -72,7 +75,7 @@ export function ProgressPage() {
       </section>
 
       <LearningHealth
-        reading={readMotivation(data.answers, data.sessions, data.activeDays, now)}
+        reading={reading}
         answers={data.answers}
         sessions={data.sessions}
         activeDays={data.activeDays}

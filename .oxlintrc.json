@@ -1,19 +1,33 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "react", "unicorn", "oxc"],
-  "categories": { "correctness": "error", "suspicious": "warn" },
+  "plugins": [
+    "typescript",
+    "react",
+    "unicorn",
+    "oxc"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
   "rules": {
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "error",
     "react/react-in-jsx-scope": "off",
     "react/exhaustive-effect-dependencies": "off",
-    "react/purity": "warn",
-    "react/set-state-in-effect": "warn",
+    "react/purity": "error",
+    "react/set-state-in-effect": "error",
     "unicorn/no-new-array": "off",
     "unicorn/no-array-sort": "off",
     "unicorn/no-array-reverse": "off",
     "unicorn/consistent-function-scoping": "off",
-    "unicorn/prefer-add-event-listener": "off"
+    "unicorn/prefer-add-event-listener": "off",
+    "eslint/no-underscore-dangle": "off",
+    "unicorn/require-post-message-target-origin": "off"
   },
-  "ignorePatterns": ["dist", "ios", "node_modules"]
+  "ignorePatterns": [
+    "dist",
+    "ios",
+    "node_modules"
+  ]
 }

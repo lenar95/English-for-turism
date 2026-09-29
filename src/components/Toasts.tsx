@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
-import { useApp } from '../state/AppContext';
+import { useActions, useAppData } from '../state/AppContext';
 import { Burst } from './Burst';
 
 /** Уведомление о новом значке. Показывается по одному, исчезает само через 4 секунды. */
 export function Toasts() {
-  const { toasts, dismissToast } = useApp();
+  const { toasts } = useAppData();
+  const { dismissToast } = useActions();
   const current = toasts[0];
   useEffect(() => {
     if (!current) return;

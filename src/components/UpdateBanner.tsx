@@ -1,8 +1,9 @@
-import { useApp } from '../state/AppContext';
+import { useActions, useAppData } from '../state/AppContext';
 
 /** Новая версия скачана и ждёт. Перезагрузку не делаем сами, чтобы не прервать тренировку. */
 export function UpdateBanner() {
-  const { updateReady, applyUpdate } = useApp();
+  const { updateReady } = useAppData();
+  const { applyUpdate } = useActions();
   if (!updateReady) return null;
   return (
     <div className="update-banner" role="status">

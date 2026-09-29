@@ -56,7 +56,7 @@ function parseSnapshot(v: unknown): Snapshot {
 function validTz(tz: unknown): string {
   if (typeof tz !== 'string' || tz.length > 64) return 'UTC';
   try {
-    new Intl.DateTimeFormat('en', { timeZone: tz });
+    Intl.DateTimeFormat('en', { timeZone: tz });
     return tz;
   } catch {
     return 'UTC';

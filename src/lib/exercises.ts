@@ -180,5 +180,3 @@ export function exerciseChecks(type: ExerciseType): { memory: boolean; pronuncia
   }
 }
 
-/** Порог, начиная с которого фраза, сказанная по памяти, считается вспомненной. */
-export const RECALL_PASS_SCORE = 60;

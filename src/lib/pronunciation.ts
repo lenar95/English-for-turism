@@ -1,4 +1,5 @@
 import { tokenize, tokenizeTurkish, wordSimilarity } from './text';
+import { PRON_BAD, PRON_GREAT, PRON_OK } from './thresholds';
 
 /** Язык фразы: английский (по умолчанию) или турецкий. */
 export type ScoreLang = 'en' | 'tr';
@@ -175,8 +176,8 @@ export function scorePronunciation(targets: string[], transcripts: string[], lan
 
 /** Текстовая оценка для пользователя. */
 export function pronunciationVerdict(score: number): { label: string; tone: 'good' | 'mid' | 'bad' } {
-  if (score >= 85) return { label: 'Отлично! Вас поймут', tone: 'good' };
-  if (score >= 65) return { label: 'Хорошо, но можно чище', tone: 'mid' };
-  if (score >= 40) return { label: 'Понятно лишь частично', tone: 'mid' };
+  if (score >= PRON_GREAT) return { label: 'Отлично! Вас поймут', tone: 'good' };
+  if (score >= PRON_OK) return { label: 'Хорошо, но можно чище', tone: 'mid' };
+  if (score >= PRON_BAD) return { label: 'Понятно лишь частично', tone: 'mid' };
   return { label: 'Пока не понятно — попробуйте ещё', tone: 'bad' };
 }

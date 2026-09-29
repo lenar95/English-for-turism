@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { readinessLevel } from '../lib/readiness';
+import { PRON_OK, READY_OK } from '../lib/thresholds';
 import { useApp } from '../state/AppContext';
 import type { Outcome } from './ExerciseRunner';
 import { Burst } from './Burst';
@@ -39,14 +40,14 @@ interface Props {
 export function SessionResult({ title, outcomes, score, onRetry, backTo, backLabel, exam, insight }: Props) {
   const { data } = useApp();
   const level = readinessLevel(score.total);
-  const mistakes = outcomes.filter((o) => o.memoryCorrect === false || (o.pronScore !== undefined && o.pronScore < 65));
+  const mistakes = outcomes.filter((o) => o.memoryCorrect === false || (o.pronScore !== undefined && o.pronScore < PRON_OK));
   const seen = new Set<string>();
   const uniqueMistakes = mistakes.filter((o) => !seen.has(o.exercise.phrase.id) && seen.add(o.exercise.phrase.id));
 
   return (
     <div className="page page--bare">
       <div className="card stack pop" style={{ alignItems: 'center', textAlign: 'center', position: 'relative' }}>
-        {score.total >= 60 && <Burst count={20} />}
+        {score.total >= READY_OK && <Burst count={20} />}
         <span className="small muted">{title}</span>
         <Ring value={score.total} size={150} label={exam ? 'результат' : 'за сессию'} />
         {exam && <span className={`level-badge tone-${level.tone}`}>{level.label}</span>}
@@ -79,7 +80,7 @@ export function SessionResult({ title, outcomes, score, onRetry, backTo, backLab
                   <span className="small muted">{o.exercise.phrase.ru}</span>
                   <div className="phrase__stats">
                     {o.memoryCorrect === false && <span className="chip chip--bad">не вспомнили</span>}
-                    {o.pronScore !== undefined && o.pronScore < 65 && <span className="chip chip--bad">произношение {o.pronScore}%</span>}
+                    {o.pronScore !== undefined && o.pronScore < PRON_OK && <span className="chip chip--bad">произношение {o.pronScore}%</span>}
                   </div>
                 </div>
                 <SpeakButtons text={o.exercise.phrase.en} showSlow={false} />

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { pronunciationVerdict, scorePronunciation, type PronunciationResult } from '../lib/pronunciation';
 import { listen, recognitionErrorText, type ListenSession } from '../lib/speech/recognition';
 import { stopSpeaking } from '../lib/speech/tts';
-import { useApp } from '../state/AppContext';
+import { PRON_BAD, PRON_GREAT } from '../lib/thresholds';
+import { useSettings } from '../state/AppContext';
 import { hapticError, hapticSuccess } from '../lib/haptics';
 import { Burst } from './Burst';
 import { IconMic, IconStop } from './Icons';
@@ -24,7 +25,7 @@ interface Props {
 type Status = 'idle' | 'listening' | 'processing' | 'done' | 'error';
 
 export function PronunciationCheck({ targets, onResult, showWords = true, compact, idleHint, disabled, lang = 'en-US' }: Props) {
-  const { speechSupported, data } = useApp();
+  const { speechSupported, settings } = useSettings();
   const [status, setStatus] = useState<Status>('idle');
   const [partial, setPartial] = useState('');
   const [result, setResult] = useState<PronunciationResult | null>(null);
@@ -32,15 +33,17 @@ export function PronunciationCheck({ targets, onResult, showWords = true, compac
   const session = useRef<ListenSession | null>(null);
 
   useEffect(() => () => session.current?.abort(), []);
-  // Новая фраза — сбрасываем результат предыдущей.
+  // Новая фраза — результат предыдущей не показываем (сброс производного состояния прямо в рендере).
   const targetKey = targets.join('|');
-  useEffect(() => {
+  const [shownFor, setShownFor] = useState(targetKey);
+  if (shownFor !== targetKey) {
+    setShownFor(targetKey);
     setResult(null);
     setStatus('idle');
     setPartial('');
-  }, [targetKey]);
+  }
 
-  if (!speechSupported || !data.settings.pronunciation) {
+  if (!speechSupported || !settings.pronunciation) {
     return (
       <p className="small muted center">
         {speechSupported
@@ -68,8 +71,8 @@ export function PronunciationCheck({ targets, onResult, showWords = true, compac
         const r = scorePronunciation(targets, alts, lang.startsWith('tr') ? 'tr' : 'en');
         setResult(r);
         setStatus('done');
-        if (r.score >= 85) hapticSuccess();
-        else if (r.score < 40) hapticError();
+        if (r.score >= PRON_GREAT) hapticSuccess();
+        else if (r.score < PRON_BAD) hapticError();
         onResult?.(r);
       })
       .catch((err: unknown) => {
@@ -114,7 +117,7 @@ export function PronunciationCheck({ targets, onResult, showWords = true, compac
       </div>
       {result && verdict && (
         <div className="pron__result pop" aria-live="polite">
-          {result.score >= 85 && <Burst />}
+          {result.score >= PRON_GREAT && <Burst />}
           <div className={`pron__score tone-${verdict.tone}`}>
             <span className="pron__score-num">{result.score}%</span>
             <span>{verdict.label}</span>

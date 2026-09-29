@@ -1,5 +1,6 @@
 import type { Scenario } from '../data/types';
 import { scenarioReadiness, tripReadiness, type ProgressMap } from './readiness';
+import { EXAM_BADGE_SCORE, READY_OK, SCENARIO_MASTERED } from './thresholds';
 
 export interface Badge {
   id: string;
@@ -11,10 +12,8 @@ export interface Badge {
   hint: string;
 }
 
-/** Готовность ситуации, с которой она считается освоенной. */
-export const SCENARIO_MASTERED = 80;
 /** Готовность, с которой человек уже справится с ситуацией («теперь вы можете…»). */
-export const SCENARIO_CAN = 60;
+const SCENARIO_CAN = READY_OK;
 
 export interface BadgeInput {
   progress: ProgressMap;
@@ -44,15 +43,15 @@ const GENERAL: BadgeRule[] = [
     id: 'exam-80',
     emoji: '🏆',
     title: 'Отличник',
-    hint: 'Набрать 80% в проверке',
-    earned: (i) => i.exams.some((e) => e.total >= 80),
+    hint: `Набрать ${EXAM_BADGE_SCORE}% в проверке`,
+    earned: (i) => i.exams.some((e) => e.total >= EXAM_BADGE_SCORE),
   },
   {
     id: 'trip-ready',
     emoji: '✈️',
     title: 'Готов к поездке',
-    hint: 'Общая готовность 60%',
-    earned: (i) => i.tripScenarios.length > 0 && tripReadiness(i.tripScenarios, i.progress, i.now, i.speechOn).total >= 60,
+    hint: `Общая готовность ${READY_OK}%`,
+    earned: (i) => i.tripScenarios.length > 0 && tripReadiness(i.tripScenarios, i.progress, i.now, i.speechOn).total >= READY_OK,
   },
 ];
 

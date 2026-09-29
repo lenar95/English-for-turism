@@ -3,10 +3,11 @@ import { ScenarioItem } from '../components/ScenarioItem';
 import { STAGES, cities, scenarios } from '../data';
 import { scenarioReadiness } from '../lib/readiness';
 import { useApp } from '../state/AppContext';
+import { useNow } from '../state/useNow';
 
 export function ScenariosPage() {
   const { data, speechOn } = useApp();
-  const now = Date.now();
+  const now = useNow();
   return (
     <div className="page">
       <header className="stack stack--sm" style={{ paddingTop: 8 }}>

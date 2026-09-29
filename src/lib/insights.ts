@@ -2,6 +2,7 @@ import type { Scenario } from '../data/types';
 import type { AppData } from '../state/model';
 import { isSuccess, type OutcomeLike } from './adaptive';
 import { activeThisWeek } from './motivation';
+import { INSIGHT_RECORD_MIN } from './thresholds';
 
 /**
  * «Открытие» после тренировки — небольшая награда, которую нельзя предсказать заранее.
@@ -23,7 +24,7 @@ export function sessionInsight(
     if (o.pronScore === undefined) continue;
     const hist = data.progress[o.exercise.phrase.id]?.pron ?? [];
     const before = hist.slice(0, -1);
-    if (before.length && o.pronScore > Math.max(...before) && o.pronScore >= 70) {
+    if (before.length && o.pronScore > Math.max(...before) && o.pronScore >= INSIGHT_RECORD_MIN) {
       candidates.push(`Личный рекорд произношения: «${o.exercise.phrase.en}» — ${o.pronScore}% (было ${Math.max(...before)}%).`);
       break;
     }

@@ -8,10 +8,12 @@ import { cityById } from '../data';
 import { localLearned } from '../lib/localPractice';
 import { scenarioReadiness, tripReadiness } from '../lib/readiness';
 import { useApp } from '../state/AppContext';
+import { useNow } from '../state/useNow';
 
 export function CityPage() {
   const { id = '' } = useParams();
   const { data, speechOn, updateTrip } = useApp();
+  const now = useNow();
   const city = cityById[id];
   if (!city) {
     return (
@@ -21,7 +23,6 @@ export function CityPage() {
       </div>
     );
   }
-  const now = Date.now();
   const selected = data.trip.cityId === city.id;
   const r = tripReadiness(city.scenarios, data.progress, now, speechOn);
   const { localLanguage: lang } = city;

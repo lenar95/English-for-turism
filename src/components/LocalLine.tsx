@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import type { LocalVersion } from '../data';
 import { localProgressKey } from '../lib/localPractice';
-import { useApp } from '../state/AppContext';
+import { useActions } from '../state/AppContext';
 import { IconMic } from './Icons';
 import { PronunciationCheck } from './PronunciationCheck';
 import { SpeakButtons } from './Speak';
 
 /** Та же фраза на местном языке: текст, произношение, озвучка и проверка через микрофон. */
 export function LocalLine({ local, phraseId, canSpeak }: { local: LocalVersion; phraseId: string; canSpeak: boolean }) {
-  const app = useApp();
+  const { pronunciation } = useActions();
   const [practice, setPractice] = useState(false);
   return (
     <div className="local-line">
@@ -38,7 +38,7 @@ export function LocalLine({ local, phraseId, canSpeak }: { local: LocalVersion; 
           lang={local.lang}
           compact
           idleHint={`Нажмите и скажите ${local.name}`}
-          onResult={(r) => app.pronunciation(localProgressKey(phraseId), r.score)}
+          onResult={(r) => pronunciation(localProgressKey(phraseId), r.score)}
         />
       )}
     </div>

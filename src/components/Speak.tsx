@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useApp } from '../state/AppContext';
+import { useSettings } from '../state/AppContext';
 import { speak, stopSpeaking } from '../lib/speech/tts';
 import { IconSpeaker, IconTurtle } from './Icons';
 
@@ -16,13 +16,13 @@ export function SpeakButtons({
   /** Язык фразы, если она не английская. */
   lang?: string;
 }) {
-  const { data } = useApp();
+  const { settings } = useSettings();
   const [playing, setPlaying] = useState<'normal' | 'slow' | null>(null);
 
   const play = async (slow: boolean) => {
     setPlaying(slow ? 'slow' : 'normal');
     try {
-      await speak(text, { accent: data.settings.accent, slow, lang });
+      await speak(text, { accent: settings.accent, slow, lang });
     } finally {
       setPlaying(null);
     }

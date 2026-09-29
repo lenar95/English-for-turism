@@ -1,15 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { scenarioById } from '../data';
 import type { Phrase } from '../data/types';
 import { isSuccess, type ExerciseSource } from '../lib/adaptive';
-import { exerciseChecks, isBuildCorrect, RECALL_PASS_SCORE, withoutSpeech, type Exercise } from '../lib/exercises';
-import type { SessionKind } from '../state/model';
-import type { PronunciationResult } from '../lib/pronunciation';
-import { scenarioById } from '../data';
-import { useApp } from '../state/AppContext';
+import { exerciseChecks, isBuildCorrect, withoutSpeech, type Exercise } from '../lib/exercises';
 import { hapticError, hapticSuccess } from '../lib/haptics';
+import type { PronunciationResult } from '../lib/pronunciation';
+import { RECALL_PASS_SCORE } from '../lib/thresholds';
+import { useActions, useSettings } from '../state/AppContext';
+import type { SessionKind } from '../state/model';
+import { useSessionLog } from '../state/useSessionLog';
 import { Burst } from './Burst';
-import { IconCheck, IconClose } from './Icons';
+import { IconCheck } from './Icons';
 import { PronunciationCheck } from './PronunciationCheck';
+import { SessionFrame } from './SessionFrame';
 import { SpeakButtons } from './Speak';
 
 export interface Outcome {
@@ -37,37 +40,23 @@ const KIND_LABEL: Record<Exercise['type'], string> = {
 };
 
 export function ExerciseRunner({ source, kind, mode, onFinish, onExit }: Props) {
-  const app = useApp();
+  const { speechOn, settings } = useSettings();
+  const { answer, pronunciation } = useActions();
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [current, setCurrent] = useState<Outcome | null>(null);
   // Следующее задание выбирается по результатам предыдущих (адаптивная сложность).
   const [exercise, setExercise] = useState<Exercise | null>(() => source.next([]));
-  const startedAt = useRef(Date.now());
   const index = outcomes.length;
   const planned = Math.max(source.planned, index + 1);
-
-  const logSession = (all: Outcome[], exitedEarly: boolean) => {
-    if (!all.length && exitedEarly && Date.now() - startedAt.current < 3000) return; // случайно открыл и закрыл
-    app.logSession({
-      start: startedAt.current,
-      end: Date.now(),
-      kind,
-      planned: source.planned,
-      done: all.length,
-      correct: all.filter(isSuccess).length,
-      exitedEarly,
-    });
-  };
+  const session = useSessionLog(kind, source.planned, { done: index, correct: outcomes.filter(isSuccess).length });
 
   const record = (o: Outcome) => {
     const checks = exerciseChecks(o.exercise.type);
     if (checks.memory && o.memoryCorrect !== undefined) {
       const answerKind = o.exercise.type === 'choose-en' || o.exercise.type === 'listen' ? 'recognition' : 'recall';
-      app.answer(o.exercise.phrase.id, o.memoryCorrect, answerKind);
+      answer(o.exercise.phrase.id, o.memoryCorrect, answerKind);
     }
-    if (checks.pronunciation && o.pronScore !== undefined) {
-      app.pronunciation(o.exercise.phrase.id, o.pronScore);
-    }
+    if (checks.pronunciation && o.pronScore !== undefined) pronunciation(o.exercise.phrase.id, o.pronScore);
   };
 
   const next = () => {
@@ -78,40 +67,33 @@ export function ExerciseRunner({ source, kind, mode, onFinish, onExit }: Props) 
     setCurrent(null);
     const upcoming = source.next(all);
     if (!upcoming) {
-      logSession(all, false);
+      session.finish({ done: all.length, correct: all.filter(isSuccess).length });
       onFinish(all);
     } else setExercise(upcoming);
   };
 
   const exit = () => {
-    logSession(outcomes, true);
+    session.exit();
     onExit();
   };
 
   if (!exercise) return null;
   // Микрофон недоступен или пропал посреди сессии: речевое задание показываем письменным.
-  // Подменяем само задание, чтобы ответ записался как задание на память, а не на произношение.
-  const shown = app.speechOn ? exercise : withoutSpeech(exercise);
+  // Подменяем само задание, чтобы ответ записался как задание на память, а не потерялся.
+  const shown = speechOn ? exercise : withoutSpeech(exercise);
 
   return (
-    // «Арена»: яркий градиент в цвете этапа поездки — как в тренажёрах внимания,
-    // энергичный фон нужен в момент действия, а экраны статистики остаются спокойными.
-    <div className={`arena arena--${scenarioById[shown.scenarioId]?.stage ?? 'basics'}`}>
-    <div className="page page--bare" style={{ minHeight: '100dvh' }}>
-      <div className="row">
-        <button type="button" className="icon-btn icon-btn--plain" onClick={exit} aria-label="Выйти">
-          <IconClose />
+    <SessionFrame
+      arena={scenarioById[shown.scenarioId]?.stage ?? 'basics'}
+      index={index}
+      planned={planned}
+      onExit={exit}
+      footer={
+        <button type="button" className="btn btn--block" disabled={!current} onClick={next}>
+          {index + 1 >= planned && (!current || isSuccess(current)) ? 'Посмотреть результат' : 'Дальше'}
         </button>
-        <div className="progress-dots grow" aria-label={`Задание ${index + 1} из ${planned}`}>
-          {Array.from({ length: planned }, (_, i) => (
-            <span key={i} className={i < index ? 'done' : i === index ? 'current' : ''} />
-          ))}
-        </div>
-        <span className="small muted" style={{ minWidth: 44, textAlign: 'right' }}>
-          {index + 1}/{planned}
-        </span>
-      </div>
-
+      }
+    >
       <ExerciseView
         key={shown.key}
         exercise={shown}
@@ -124,17 +106,10 @@ export function ExerciseRunner({ source, kind, mode, onFinish, onExit }: Props) 
           }
           setCurrent(o);
         }}
-        speechOn={app.speechOn}
-        showTr={app.data.settings.showTranscription}
+        speechOn={speechOn}
+        showTr={settings.showTranscription}
       />
-
-      <div className="sticky-footer">
-        <button type="button" className="btn btn--block" disabled={!current} onClick={next}>
-          {index + 1 >= planned && (!current || isSuccess(current)) ? 'Посмотреть результат' : 'Дальше'}
-        </button>
-      </div>
-    </div>
-    </div>
+    </SessionFrame>
   );
 }
 

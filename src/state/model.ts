@@ -1,6 +1,7 @@
 import { DAY, dayKey } from '../lib/dates';
 import { applyAnswer, MAX_LEVEL, stabilityDays, type AnswerKind, type MemoryState } from '../lib/memory';
 import { emptyPhraseProgress, PRON_HISTORY, pushPron, type PhraseProgress } from '../lib/progress';
+import { PRON_OK } from '../lib/thresholds';
 import type { Accent } from '../lib/speech/tts';
 
 export interface Settings {
@@ -166,7 +167,7 @@ export function reducer(data: AppData, action: Action): AppData {
         ...data,
         progress: { ...data.progress, [action.phraseId]: pushPron(prev, action.score) },
         activeDays: markActive(data, action.now),
-        answers: pushAnswer(data.answers, { t: action.now, phraseId: action.phraseId, ok: action.score >= 65 }),
+        answers: pushAnswer(data.answers, { t: action.now, phraseId: action.phraseId, ok: action.score >= PRON_OK }),
       };
     }
     case 'exam':

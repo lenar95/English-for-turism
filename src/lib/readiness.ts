@@ -1,6 +1,7 @@
 import type { Phrase, Scenario } from '../data/types';
 import { memoryStrength } from './memory';
 import { pronunciationOf, type PhraseProgress } from './progress';
+import { READY_BASIC, READY_CONFIDENT, READY_OK } from './thresholds';
 
 export type ProgressMap = Record<string, PhraseProgress | undefined>;
 
@@ -86,19 +87,19 @@ export interface ReadinessLevel {
 }
 
 export function readinessLevel(total: number): ReadinessLevel {
-  if (total >= 85)
+  if (total >= READY_CONFIDENT)
     return {
       label: 'Уверенный путешественник',
       description: 'Вы справитесь с этими ситуациями сами. Повторяйте раз в несколько дней, чтобы не забыть.',
       tone: 'great',
     };
-  if (total >= 60)
+  if (total >= READY_OK)
     return {
       label: 'Готов к поездке',
       description: 'Основные фразы вы знаете и вас поймут. Подтяните слабые места.',
       tone: 'good',
     };
-  if (total >= 30)
+  if (total >= READY_BASIC)
     return {
       label: 'Базовый уровень',
       description: 'Кое-что уже получается, но в живом разговоре будет трудно. Продолжайте тренироваться.',

@@ -28,10 +28,10 @@ async function main() {
       });
       const page = await context.newPage();
       const errors = [];
-      const console_ = [];
+      const messages = [];
       page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
       page.on('console', (m) => {
-        console_.push(`${m.type()}: ${m.text()}`);
+        messages.push(`${m.type()}: ${m.text()}`);
         if (m.type() === 'error') errors.push(`console: ${m.text()}`);
       });
       /** Переход внутри приложения (HashRouter) и ожидание элемента с подробной диагностикой при сбое. */
@@ -41,10 +41,11 @@ async function main() {
         }, hash);
         try {
           await page.waitForSelector(selector, { timeout: 10000 });
-        } catch (e) {
+        } catch (cause) {
           const body = await page.evaluate(() => document.body.innerText.slice(0, 400)).catch(() => '(нет body)');
           throw new Error(
-            `${what}: не дождались «${selector}» по адресу ${page.url()}\n--- текст страницы ---\n${body}\n--- консоль ---\n${console_.slice(-15).join('\n')}`,
+            `${what}: не дождались «${selector}» по адресу ${page.url()}\n--- текст страницы ---\n${body}\n--- консоль ---\n${messages.slice(-15).join('\n')}`,
+            { cause },
           );
         }
       };

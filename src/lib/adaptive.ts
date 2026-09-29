@@ -3,6 +3,7 @@ import { chooseType, makeExercise, phraseWords, shuffle, type Exercise, type Exe
 import { isDue, memoryStrength } from './memory';
 import { pronunciationOf } from './progress';
 import type { ProgressMap } from './readiness';
+import { PRON_OK } from './thresholds';
 
 /**
  * Адаптивная тренировка — быстрый контур управления внутри сессии.
@@ -31,7 +32,7 @@ export type SessionMode = 'normal' | 'minimal' | 'warmup';
 
 export function isSuccess(o: OutcomeLike): boolean {
   if (o.memoryCorrect !== undefined) return o.memoryCorrect;
-  if (o.pronScore !== undefined) return o.pronScore >= 65;
+  if (o.pronScore !== undefined) return o.pronScore >= PRON_OK;
   return true;
 }
 

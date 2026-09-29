@@ -8,12 +8,14 @@ import { stageStyle } from '../components/stage';
 import { cityById, scenarioById } from '../data';
 import { scenarioReadiness } from '../lib/readiness';
 import { useApp } from '../state/AppContext';
+import { useNow } from '../state/useNow';
 
 type Filter = 'all' | 'you' | 'them';
 
 export function ScenarioPage() {
   const { id = '' } = useParams();
   const { data, speechOn } = useApp();
+  const now = useNow();
   const [filter, setFilter] = useState<Filter>('all');
   const scenario = scenarioById[id];
   const city = scenario?.cityId ? cityById[scenario.cityId] : undefined;
@@ -25,7 +27,7 @@ export function ScenarioPage() {
       </div>
     );
   }
-  const r = scenarioReadiness(scenario, data.progress, Date.now(), speechOn);
+  const r = scenarioReadiness(scenario, data.progress, now, speechOn);
   const phrases = scenario.phrases.filter((p) => filter === 'all' || p.speaker === filter);
 
   return (

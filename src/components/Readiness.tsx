@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
+import { READY_OK } from '../lib/thresholds';
 
 /** Цвет прогресса: янтарный — в процессе, зелёный — готово. Красный оставляем для ошибок. */
 export function toneOf(value: number): 'mid' | 'good' {
-  return value >= 60 ? 'good' : 'mid';
+  return value >= READY_OK ? 'good' : 'mid';
 }
 
 const toneColor = (v: number) => (v === 0 ? 'var(--neutral)' : `var(--${toneOf(v)})`);

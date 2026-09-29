@@ -1,6 +1,7 @@
 import { STAGES, cityById } from '../data';
 import type { Scenario, Stage } from '../data/types';
 import { scenarioReadiness, type ProgressMap } from '../lib/readiness';
+import { READY_OK } from '../lib/thresholds';
 import { IconCheck } from './Icons';
 import { ScenarioItem } from './ScenarioItem';
 import { stageStyle } from './stage';
@@ -37,7 +38,7 @@ export function RouteMap({ scenarios, progress, now, speechOn }: { scenarios: Sc
         const rs = g.scenarios.map((s) => scenarioReadiness(s, progress, now, speechOn));
         const avg = Math.round(rs.reduce((a, r) => a + r.total, 0) / rs.length);
         const started = rs.some((r) => r.practiced > 0);
-        const done = avg >= 60;
+        const done = avg >= READY_OK;
         return (
           <section key={g.key} className={`stop ${done ? 'stop--done' : ''} ${started ? 'stop--started' : ''}`} style={stageStyle(g.stage)}>
             <div className="stop__node" aria-hidden>

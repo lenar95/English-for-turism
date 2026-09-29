@@ -3,7 +3,8 @@ import { localOf } from '../data';
 import type { Phrase } from '../data/types';
 import { MAX_LEVEL } from '../lib/memory';
 import { pronunciationOf } from '../lib/progress';
-import { useApp } from '../state/AppContext';
+import { PRON_OK } from '../lib/thresholds';
+import { useActions, useAppData, useSettings } from '../state/AppContext';
 import { IconExpand, IconMic } from './Icons';
 import { LocalLine } from './LocalLine';
 import { PronunciationCheck } from './PronunciationCheck';
@@ -11,12 +12,14 @@ import { ShowToPerson } from './ShowToPerson';
 import { SpeakButtons } from './Speak';
 
 export function PhraseCard({ phrase, context }: { phrase: Phrase; context?: string }) {
-  const app = useApp();
+  const { data } = useAppData();
+  const { speechOn, settings } = useSettings();
+  const { pronunciation } = useActions();
   const [practice, setPractice] = useState(false);
   const [show, setShow] = useState(false);
-  const p = app.data.progress[phrase.id];
+  const p = data.progress[phrase.id];
   const pron = pronunciationOf(p);
-  const canSpeak = phrase.speaker === 'you' && app.speechOn;
+  const canSpeak = phrase.speaker === 'you' && speechOn;
   const local = localOf(phrase);
 
   return (
@@ -29,7 +32,7 @@ export function PhraseCard({ phrase, context }: { phrase: Phrase; context?: stri
         {context && <span className="chip">{context}</span>}
       </div>
       <span className="phrase__en" lang="en">{phrase.en}</span>
-      {app.data.settings.showTranscription && <span className="phrase__tr">{phrase.tr}</span>}
+      {settings.showTranscription && <span className="phrase__tr">{phrase.tr}</span>}
       <span className="phrase__ru">{phrase.ru}</span>
       {local && <LocalLine local={local} phraseId={phrase.id} canSpeak={canSpeak} />}
       {phrase.note && <p className="phrase__note">💡 {phrase.note}</p>}
@@ -54,12 +57,12 @@ export function PhraseCard({ phrase, context }: { phrase: Phrase; context?: stri
         <div className="phrase__stats">
           {p && p.memory.level > 0 && <span className="chip">память {p.memory.level}/{MAX_LEVEL}</span>}
           {pron !== null && (
-            <span className={`chip ${pron >= 65 ? 'chip--good' : 'chip--bad'}`}>🎙 {Math.round(pron)}%</span>
+            <span className={`chip ${pron >= PRON_OK ? 'chip--good' : 'chip--bad'}`}>🎙 {Math.round(pron)}%</span>
           )}
         </div>
       </div>
       {practice && canSpeak && (
-        <PronunciationCheck targets={[phrase.en]} compact onResult={(r) => app.pronunciation(phrase.id, r.score)} />
+        <PronunciationCheck targets={[phrase.en]} compact onResult={(r) => pronunciation(phrase.id, r.score)} />
       )}
       {show && <ShowToPerson phrase={phrase} onClose={() => setShow(false)} />}
     </article>

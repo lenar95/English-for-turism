@@ -7,6 +7,7 @@ import { createAdaptiveSession, fixedSource, type SessionMode } from '../lib/ada
 import { buildExam } from '../lib/exercises';
 import { sessionInsight } from '../lib/insights';
 import { useApp } from '../state/AppContext';
+import { useNow } from '../state/useNow';
 
 /**
  * Тренировка или проверка готовности.
@@ -19,6 +20,7 @@ export function SessionPage({ mode }: { mode: 'practice' | 'exam' }) {
   const size = sessionMode === 'normal' ? 10 : 5;
   const navigate = useNavigate();
   const app = useApp();
+  const now = useNow();
   const [round, setRound] = useState(0);
   const [outcomes, setOutcomes] = useState<Outcome[] | null>(null);
   // Доступность микрофона фиксируем на время сессии: задания уже подобраны под неё,
@@ -36,14 +38,14 @@ export function SessionPage({ mode }: { mode: 'practice' | 'exam' }) {
     () =>
       mode === 'exam'
         ? fixedSource(buildExam(pool, speechOn, scenario ? 10 : 20))
-        : createAdaptiveSession(pool, app.data.progress, Date.now(), speechOn, size, sessionMode, Math.random, focusKey),
+        : createAdaptiveSession(pool, app.data.progress, now, speechOn, size, sessionMode, Math.random, focusKey),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [round, scope, mode, sessionMode, app.ready],
   );
 
   // Выбираем «открытие» один раз на результат, чтобы оно не менялось при перерисовке.
   const insight = useMemo(
-    () => (outcomes && mode === 'practice' ? sessionInsight(outcomes, app.data, pool, Date.now()) : null),
+    () => (outcomes && mode === 'practice' ? sessionInsight(outcomes, app.data, pool, now) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [outcomes],
   );

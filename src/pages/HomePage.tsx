@@ -6,10 +6,12 @@ import { TodayPlan, WeekDots } from '../components/TodayPlan';
 import { stageStyle } from '../components/stage';
 import { cities, cityById } from '../data';
 import { daysUntil } from '../lib/dates';
-import { activeThisWeek, readMotivation, rememberedShare } from '../lib/motivation';
+import { activeThisWeek, rememberedShare } from '../lib/motivation';
 import { pushSupport } from '../lib/push';
-import { scenarioReadiness, tripReadiness } from '../lib/readiness';
+import { scenarioReadiness } from '../lib/readiness';
 import { useApp } from '../state/AppContext';
+import { useMotivation, useReadiness } from '../state/selectors';
+import { useNow } from '../state/useNow';
 
 function greeting(now: number): string {
   const h = new Date(now).getHours();
@@ -21,13 +23,13 @@ function greeting(now: number): string {
 
 export function HomePage() {
   const { data, tripScenarios, speechOn, plan, backend } = useApp();
-  const now = Date.now();
-  const trip = tripReadiness(tripScenarios, data.progress, now, speechOn);
+  const now = useNow();
+  const trip = useReadiness();
   const perScenario = tripScenarios.map((s) => ({ s, r: scenarioReadiness(s, data.progress, now, speechOn) }));
   const weakest = [...perScenario].sort((a, b) => a.r.total - b.r.total)[0];
   const days = daysUntil(data.trip.date, now);
   const city = cityById[data.trip.cityId];
-  const reading = readMotivation(data.answers, data.sessions, data.activeDays, now);
+  const reading = useMotivation();
   const week = activeThisWeek(data.activeDays, now);
   const can = tripScenarios.filter((s) => data.badges.includes(`can:${s.id}`));
 
@@ -48,7 +50,7 @@ export function HomePage() {
         speechOn={speechOn}
       />
 
-      <WeekDots days={week.days} count={week.count} goal={data.weeklyGoal} />
+      <WeekDots days={week.days} count={week.count} goal={data.weeklyGoal} todayIndex={(new Date(now).getDay() + 6) % 7} />
 
       <TodayPlan plan={plan} reading={reading} remembered={rememberedShare(tripScenarios, data.progress, now)} />
 

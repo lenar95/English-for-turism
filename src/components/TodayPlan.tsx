@@ -56,14 +56,13 @@ export function TodayPlan({ plan, reading, remembered }: { plan: DailyPlan; read
 }
 
 /** Недельная цель: прощающая замена серии дней подряд. */
-export function WeekDots({ days, count, goal }: { days: boolean[]; count: number; goal: number }) {
+export function WeekDots({ days, count, goal, todayIndex }: { days: boolean[]; count: number; goal: number; todayIndex: number }) {
   const labels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-  const todayIdx = (new Date().getDay() + 6) % 7;
   return (
     <div className="week" title={`Цель недели: ${goal} дн.`}>
       <div className="week__dots">
         {days.map((on, i) => (
-          <span key={i} className={`week__dot ${on ? 'on' : ''} ${i === todayIdx ? 'today' : ''}`}>
+          <span key={i} className={`week__dot ${on ? 'on' : ''} ${i === todayIndex ? 'today' : ''}`}>
             <span>{labels[i]}</span>
           </span>
         ))}
