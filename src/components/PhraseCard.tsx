@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { localOf } from '../data';
 import type { Phrase } from '../data/types';
 import { MAX_LEVEL } from '../lib/memory';
 import { pronunciationOf } from '../lib/progress';
 import { useApp } from '../state/AppContext';
 import { IconExpand, IconMic } from './Icons';
+import { LocalLine } from './LocalLine';
 import { PronunciationCheck } from './PronunciationCheck';
 import { ShowToPerson } from './ShowToPerson';
 import { SpeakButtons } from './Speak';
@@ -15,6 +17,7 @@ export function PhraseCard({ phrase, context }: { phrase: Phrase; context?: stri
   const p = app.data.progress[phrase.id];
   const pron = pronunciationOf(p);
   const canSpeak = phrase.speaker === 'you' && app.speechOn;
+  const local = localOf(phrase);
 
   return (
     <article className="card phrase">
@@ -28,6 +31,7 @@ export function PhraseCard({ phrase, context }: { phrase: Phrase; context?: stri
       <span className="phrase__en" lang="en">{phrase.en}</span>
       {app.data.settings.showTranscription && <span className="phrase__tr">{phrase.tr}</span>}
       <span className="phrase__ru">{phrase.ru}</span>
+      {local && <LocalLine local={local} />}
       {phrase.note && <p className="phrase__note">💡 {phrase.note}</p>}
       <div className="phrase__actions">
         <SpeakButtons text={phrase.en} />

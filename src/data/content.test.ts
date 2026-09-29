@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allScenarios as scenarios, cities } from '.';
+import { allScenarios as scenarios, cities, localOf } from '.';
 import { scorePronunciation } from '../lib/pronunciation';
 
 describe('контент', () => {
@@ -50,5 +50,19 @@ describe('контент', () => {
         for (const t of [p.en, ...(p.alt ?? [])]) {
           expect(scorePronunciation([p.en, ...(p.alt ?? [])], [t.replace(/[.,!?]/g, '')]).score, t).toBe(100);
         }
+  });
+
+  it('перевод на местный язык есть у каждой фразы городского набора и только там', () => {
+    for (const s of scenarios)
+      for (const p of s.phrases) {
+        if (!s.cityId) {
+          expect(p.local, p.id).toBeUndefined();
+          continue;
+        }
+        expect(p.local, p.id).toBeDefined();
+        expect(p.local!.text.trim(), p.id).not.toBe('');
+        expect(p.local!.tr, p.id).not.toMatch(/[A-Za-z]/);
+        expect(localOf(p)?.lang, p.id).toBe(cities.find((c) => c.id === s.cityId)!.localLanguage.lang);
+      }
   });
 });

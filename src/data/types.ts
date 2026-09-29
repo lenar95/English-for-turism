@@ -24,6 +24,15 @@ export interface Phrase {
   alt?: string[];
   /** Короткая подсказка по-русски: когда говорить, на что обратить внимание. */
   note?: string;
+  /** Та же фраза на местном языке города (для городских наборов). Язык берётся из CityPack.localLanguage. */
+  local?: LocalPhrase;
+}
+
+/** Перевод фразы на местный язык. */
+export interface LocalPhrase {
+  text: string;
+  /** Произношение русскими буквами. */
+  tr: string;
 }
 
 export interface DialogueLine {

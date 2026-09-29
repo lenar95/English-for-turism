@@ -66,3 +66,21 @@ export const phraseById: Record<string, PhraseRef> = Object.fromEntries(
 );
 
 export const allPhrases: PhraseRef[] = Object.values(phraseById);
+
+export interface LocalVersion {
+  text: string;
+  tr: string;
+  /** BCP 47 для озвучки. */
+  lang: string;
+  /** «по-турецки». */
+  name: string;
+}
+
+/** Фраза на местном языке города, если она есть в наборе. */
+export function localOf(phrase: Phrase): LocalVersion | null {
+  if (!phrase.local) return null;
+  const cityId = phraseById[phrase.id]?.scenario.cityId;
+  const city = cityId ? cityById[cityId] : undefined;
+  if (!city) return null;
+  return { ...phrase.local, lang: city.localLanguage.lang, name: city.localLanguage.name };
+}

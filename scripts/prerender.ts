@@ -42,6 +42,7 @@ h1{font-size:28px;line-height:1.2;letter-spacing:-.02em;margin:0 0 8px}h2{font-s
 .phrase{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:start}
 .en{font-weight:700;font-size:18px}.tr{color:var(--primary)}.ru{color:var(--muted)}
 .note{grid-column:1/-1;font-size:14px;color:var(--muted);margin-top:6px}
+.local{grid-column:1/-1;display:grid;grid-template-columns:1fr auto;gap:2px 12px;margin-top:8px;padding:8px 10px;border-left:3px solid #e30a17;background:var(--soft);border-radius:10px}.local .en{font-size:16px}.local .small{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}.local .say{background:var(--surface)}
 .tag{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;margin-bottom:4px;background:var(--soft);color:var(--primary)}
 .tag.them{background:var(--them-soft);color:var(--them)}.key{color:var(--accent)}
 .say{border:0;background:var(--soft);color:var(--primary);border-radius:10px;width:40px;height:40px;font-size:18px;cursor:pointer;grid-row:1/4;grid-column:2}
@@ -102,13 +103,19 @@ const crumbs = (items: { name: string; path: string }[]) => ({
   itemListElement: items.map((it, i) => ({ '@type': 'ListItem', position: i + 1, name: it.name, item: `${SITE}${it.path}` })),
 });
 
-function phraseCard(p: Phrase): string {
+function phraseCard(p: Phrase, city?: CityPack): string {
+  const loc = city && p.local ? city.localLanguage : null;
   return `<div class="card phrase">
 <div><span class="tag${p.speaker === 'them' ? ' them' : ''}">${p.speaker === 'you' ? 'Говорите вы' : 'Говорят вам'}</span>${p.key ? ' <span class="key">★</span>' : ''}</div>
 <button class="say" type="button" data-text="${esc(p.en)}" aria-label="Прослушать">🔊</button>
 <div class="en" lang="en">${esc(p.en)}</div>
 <div class="tr">${esc(p.tr)}</div>
 <div class="ru">${esc(p.ru)}</div>
+${
+  loc && p.local
+    ? `<div class="local"><button class="say" type="button" data-lang="${loc.lang}" data-text="${esc(p.local.text)}" aria-label="Прослушать ${esc(loc.name)}">🔊</button><div class="small">${esc(loc.name)}</div><div class="en" lang="${loc.lang.slice(0, 2)}">${esc(p.local.text)}</div><div class="tr">${esc(p.local.tr)}</div></div>`
+    : ''
+}
 ${p.note ? `<div class="note">💡 ${esc(p.note)}</div>` : ''}
 </div>`;
 }
@@ -134,7 +141,7 @@ function scenarioPage(s: Scenario, city?: CityPack): PageMeta {
 <p class="muted">В приложении — проверка произношения через микрофон, диалог-тренажёр и шкала готовности к поездке.</p>
 <h2>Фразы (${n})</h2>
 <div class="cards">
-${s.phrases.map(phraseCard).join('\n')}
+${s.phrases.map((p) => phraseCard(p, city)).join('\n')}
 </div>
 ${
   dialogue
