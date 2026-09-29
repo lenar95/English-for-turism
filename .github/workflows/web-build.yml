@@ -4,7 +4,7 @@ name: Publish web build
 # Сервер (см. deploy/install.sh) сам подтягивает эту ветку каждые 2 минуты.
 on:
   push:
-    branches: [main, claude/relaxed-archimedes-kfq2pv]
+    branches: [main]
   workflow_dispatch:
 
 permissions:

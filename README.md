@@ -118,17 +118,19 @@ Workflow `.github/workflows/pages.yml` публикует сайт при пуш
 
 ### Веб-версия на своём сервере (VPS)
 
-Workflow `.github/workflows/web-build.yml` на каждый пуш собирает сайт и кладёт готовые файлы в ветку `web-build`.
-Сервер раз в 2 минуты сам подтягивает эту ветку, поэтому ключи и пароли от сервера в GitHub хранить не нужно.
+Рабочая ветка — `main`: из неё собирается и публикуется сайт. Workflow `.github/workflows/web-build.yml` при пуше в `main`
+собирает сайт и кладёт готовые файлы в ветку `web-build`. Сервер раз в 2 минуты сам подтягивает эту ветку,
+поэтому ключи и пароли от сервера в GitHub хранить не нужно.
 
 Сайт работает на **https://engtrip.ru**. Установка на чистый Ubuntu 22.04/24.04 (под root; у домена должны быть записи A/AAAA на IP сервера и CNAME `www` на сам домен):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lenar95/English-for-turism/claude/relaxed-archimedes-kfq2pv/deploy/install.sh | bash -s -- engtrip.ru ваш@email
+curl -fsSL https://raw.githubusercontent.com/lenar95/English-for-turism/main/deploy/install.sh | bash -s -- engtrip.ru ваш@email
 ```
 
-Скрипт ставит Caddy с автоматическим HTTPS от Let's Encrypt (без HTTPS браузер не даст доступ к микрофону)
-и таймер автообновления. Логи: `journalctl -u caddy -f`, обновления: `journalctl -u english-for-tourism-update`.
+Скрипт ставит Caddy с автоматическим HTTPS от Let's Encrypt (без HTTPS браузер не даст доступ к микрофону),
+Node.js 22 из репозитория NodeSource для сервиса напоминаний (в apt Ubuntu 22.04 лежит Node.js 12, на нём сервис
+не запускается) и таймер автообновления. Логи: `journalctl -u caddy -f`, обновления: `journalctl -u english-for-tourism-update`.
 
 ### Сервис напоминаний
 
@@ -160,8 +162,8 @@ npm run ios:open   # открыть проект в Xcode
 [`@capacitor/preferences`](https://capacitorjs.com/docs/apis/preferences) (хранение прогресса, которое iOS
 не очищает, в отличие от localStorage в WebView).
 
-CI (`.github/workflows/ci.yml`) на каждый пуш прогоняет тесты, собирает веб-версию и собирает iOS-проект
-под симулятор на macOS-раннере.
+CI (`.github/workflows/ci.yml`) на каждый пуш прогоняет тесты и собирает веб-версию. iOS-проект под симулятор
+на macOS-раннере собирается только для `main` и pull request'ов.
 
 ## Структура
 

@@ -7,6 +7,9 @@ on:
 jobs:
   web:
     name: Тесты и сборка веб-версии
+    # На пуш проверяем любую ветку. PR из этого же репозитория уже проверен пушем в его ветку,
+    # поэтому по событию pull_request запускаемся только для PR из форков.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +27,8 @@ jobs:
 
   ios:
     name: Сборка iOS (симулятор)
+    # macOS-раннер медленный и дорогой: iOS собираем только для main и pull request'ов.
+    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4

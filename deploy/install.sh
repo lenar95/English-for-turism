@@ -2,13 +2,14 @@
 # Установка веб-версии «Английский в поездку» на VPS (Ubuntu 22.04/24.04).
 #
 # Запуск на сервере под root (у домена должны быть DNS-записи A/AAAA на сервер и CNAME www на сам домен):
-#   curl -fsSL https://raw.githubusercontent.com/lenar95/English-for-turism/claude/relaxed-archimedes-kfq2pv/deploy/install.sh | bash -s -- engtrip.ru ваш@email
+#   curl -fsSL https://raw.githubusercontent.com/lenar95/English-for-turism/main/deploy/install.sh | bash -s -- engtrip.ru ваш@email
 #
 # Email нужен центрам сертификации: без него не работает запасной центр ZeroSSL,
 # а Let's Encrypt может отказать, если на общий домен хостинга уже выпущено слишком много сертификатов.
 #
 # Что делает:
-#   1. Ставит Caddy (веб-сервер с автоматическим HTTPS от Let's Encrypt) и git.
+#   1. Ставит Caddy (веб-сервер с автоматическим HTTPS от Let's Encrypt), git и Node.js 22 из репозитория NodeSource
+#      (в apt Ubuntu 22.04 лежит Node.js 12, на нём сервис напоминаний не запускается).
 #   2. Скачивает готовую сборку сайта из ветки web-build репозитория.
 #   3. Включает таймер, который раз в 2 минуты подтягивает свежую сборку.
 #   4. Запускает сервис напоминаний (Node.js) — он получает запросы /api/* через Caddy.
@@ -30,7 +31,27 @@ if [[ -z "$EMAIL" ]]; then echo "Предупреждение: email не ука
 echo "==> Устанавливаю пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
-apt-get install -y -q caddy git ca-certificates nodejs
+apt-get install -y -q caddy git ca-certificates curl gnupg
+
+# Сервис напоминаний собран под Node.js 18+ (см. build:server в package.json).
+# В apt Ubuntu 22.04 лежит Node.js 12, поэтому при нехватке версии ставим Node.js из репозитория NodeSource.
+NODE_MIN=18
+NODE_MAJOR=22
+node_major() { command -v node >/dev/null 2>&1 && node --version | sed -E 's/^v([0-9]+).*/\1/' || echo 0; }
+if (( $(node_major) < NODE_MIN )); then
+  echo "==> Устанавливаю Node.js $NODE_MAJOR (в системе: $(node --version 2>/dev/null || echo 'не установлен'))"
+  mkdir -p /etc/apt/keyrings
+  curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor --batch --yes -o /etc/apt/keyrings/nodesource.gpg
+  echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
+  apt-get update -q
+  apt-get install -y -q nodejs
+fi
+if (( $(node_major) < NODE_MIN )); then
+  echo "Нужен Node.js $NODE_MIN или новее, а установлен $(node --version 2>/dev/null || echo 'никакой'). Установите Node.js и запустите скрипт снова." >&2
+  exit 1
+fi
+NODE_BIN=$(command -v node)
+echo "Node.js: $(node --version) ($NODE_BIN)"
 
 echo "==> Скачиваю сборку сайта"
 if [[ -d "$WEB_DIR/.git" ]]; then
@@ -101,7 +122,7 @@ User=eft-push
 Environment=PORT=$PUSH_PORT
 Environment=DATA_DIR=$DATA_DIR
 Environment=VAPID_SUBJECT=https://$DOMAIN
-ExecStart=/usr/bin/node $WEB_DIR/.server/server.cjs
+ExecStart=$NODE_BIN $WEB_DIR/.server/server.cjs
 Restart=always
 RestartSec=5
 NoNewPrivileges=true
