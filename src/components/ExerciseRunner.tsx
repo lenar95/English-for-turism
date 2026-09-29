@@ -4,6 +4,7 @@ import { isSuccess, type ExerciseSource } from '../lib/adaptive';
 import { exerciseChecks, isBuildCorrect, RECALL_PASS_SCORE, type Exercise } from '../lib/exercises';
 import type { SessionKind } from '../state/model';
 import type { PronunciationResult } from '../lib/pronunciation';
+import { scenarioById } from '../data';
 import { useApp } from '../state/AppContext';
 import { hapticError, hapticSuccess } from '../lib/haptics';
 import { Burst } from './Burst';
@@ -90,6 +91,9 @@ export function ExerciseRunner({ source, kind, mode, onFinish, onExit }: Props) 
   if (!exercise) return null;
 
   return (
+    // «Арена»: яркий градиент в цвете этапа поездки — как в тренажёрах внимания,
+    // энергичный фон нужен в момент действия, а экраны статистики остаются спокойными.
+    <div className={`arena arena--${scenarioById[exercise.scenarioId]?.stage ?? 'basics'}`}>
     <div className="page page--bare" style={{ minHeight: '100dvh' }}>
       <div className="row">
         <button type="button" className="icon-btn icon-btn--plain" onClick={exit} aria-label="Выйти">
@@ -126,6 +130,7 @@ export function ExerciseRunner({ source, kind, mode, onFinish, onExit }: Props) 
           {index + 1 >= planned && (!current || isSuccess(current)) ? 'Посмотреть результат' : 'Дальше'}
         </button>
       </div>
+    </div>
     </div>
   );
 }

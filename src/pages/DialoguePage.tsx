@@ -39,7 +39,8 @@ export function DialoguePage() {
   const others = scenario.dialogues.filter((d) => d.id !== dialogue.id);
 
   return (
-    <div className="page page--bare">
+    <div className={`arena arena--${scenario.stage}`}>
+    <div className="page page--bare" style={{ minHeight: '100dvh' }}>
       <TopBar back={`/scenario/${scenario.id}`} title={dialogue.title} />
       <DialogueRun
         key={`${dialogue.id}-${round}`}
@@ -59,6 +60,7 @@ export function DialoguePage() {
           </>
         }
       />
+    </div>
     </div>
   );
 }

@@ -2027,3 +2027,279 @@ details[open] summary .chev {
   padding: 7px 12px;
   font-size: 13px;
 }
+
+/* ---------- Арена: яркие экраны действия (тренировка, проверка, диалог) ----------
+ * Принцип как в тренажёрах внимания: насыщенный фон (S 70–90%, L ~50%) с градиентом
+ * в пределах одного семейства оттенков (сдвиг 15–30°) и белые «стеклянные» карточки.
+ * Экраны статистики остаются спокойными — яркость дозируется по ситуации.
+ * Сетка отступов — 8 pt: 8 / 16 / 24, радиусы 16 / 24.
+ */
+@property --arena-a {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #1e88e5;
+}
+
+@property --arena-b {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #22b8d8;
+}
+
+.arena {
+  --arena-a: #1e88e5;
+  --arena-b: #22b8d8;
+  --glass: rgba(255, 255, 255, 0.24);
+  --on-arena: #ffffff;
+  min-height: 100dvh;
+  color: var(--on-arena);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.14) 0 64px, transparent 65px),
+    radial-gradient(circle at 88% 42%, rgba(255, 255, 255, 0.1) 0 88px, transparent 89px),
+    radial-gradient(circle at 24% 86%, rgba(255, 255, 255, 0.09) 0 72px, transparent 73px),
+    linear-gradient(150deg, var(--arena-a), var(--arena-b));
+  background-attachment: fixed;
+  transition:
+    --arena-a 0.6s ease,
+    --arena-b 0.6s ease;
+}
+
+/* Пары оттенков по этапам: сдвиг в пределах одного семейства цветов. */
+.arena--basics { --arena-a: #5b5ce6; --arena-b: #8f6cf0; }
+.arena--airport { --arena-a: #1e88e5; --arena-b: #21b5d6; }
+.arena--hotel { --arena-a: #ec7d22; --arena-b: #f2aa2e; }
+.arena--city { --arena-a: #18c08a; --arena-b: #22c3c2; }
+.arena--help { --arena-a: #e9483f; --arena-b: #f2765a; }
+.arena--departure { --arena-a: #8757e8; --arena-b: #c05fe0; }
+
+@media (prefers-color-scheme: dark) {
+  .arena {
+    --glass: rgba(255, 255, 255, 0.1);
+    background:
+      radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.06) 0 64px, transparent 65px),
+      radial-gradient(circle at 88% 42%, rgba(255, 255, 255, 0.05) 0 88px, transparent 89px),
+      linear-gradient(150deg, color-mix(in srgb, var(--arena-a) 55%, #0d0f14), color-mix(in srgb, var(--arena-b) 45%, #0d0f14));
+    background-attachment: fixed;
+  }
+}
+
+/* Карточки: белые (в тёмной теме — тёмные) со светящейся полупрозрачной рамкой. */
+.arena .card,
+.arena .option,
+.arena .pron__result,
+.arena .bubble--them,
+.arena .feedback {
+  color: var(--text);
+  box-shadow:
+    0 0 0 8px var(--glass),
+    0 8px 24px -8px rgba(0, 0, 0, 0.25);
+}
+
+.arena .card,
+.arena .option,
+.arena .pron__result {
+  background: var(--surface);
+  border-radius: 24px;
+}
+
+.arena .option {
+  border: 2px solid transparent;
+  padding: 16px;
+  margin: 4px 0;
+}
+
+.arena .options {
+  gap: 16px;
+}
+
+.arena .option.correct {
+  border-color: var(--good);
+  background: color-mix(in srgb, var(--good) 14%, var(--surface));
+}
+
+.arena .option.wrong {
+  border-color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 12%, var(--surface));
+}
+
+.arena .feedback {
+  border-radius: 24px;
+  padding: 16px;
+}
+
+.arena .feedback--good {
+  background: color-mix(in srgb, var(--good) 12%, var(--surface));
+}
+
+.arena .feedback--bad,
+.arena .feedback--mid {
+  background: var(--surface);
+}
+
+.arena .exercise {
+  gap: 24px;
+}
+
+.arena .exercise__kind,
+.arena .topbar__title,
+.arena .pron__hint,
+.arena > .page > .row .small {
+  color: var(--on-arena);
+  opacity: 0.92;
+}
+
+.arena .card .pron__hint {
+  color: var(--text-2);
+}
+
+.arena .icon-btn--plain {
+  color: var(--on-arena);
+}
+
+.arena .progress-dots span {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.arena .progress-dots span.done {
+  background: #fff;
+}
+
+.arena .progress-dots span.current {
+  background: rgba(255, 255, 255, 0.65);
+}
+
+/* Сборка фразы: поле ответа — полупрозрачное стекло, плитки — белые. */
+.arena .tiles--answer {
+  border: 2px dashed rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 24px;
+  padding: 16px;
+}
+
+.arena .tiles--answer.correct {
+  border: 2px solid #fff;
+  background: color-mix(in srgb, var(--good) 45%, transparent);
+}
+
+.arena .tiles--answer.wrong {
+  border: 2px solid #fff;
+  background: color-mix(in srgb, var(--bad) 45%, transparent);
+}
+
+.arena .tiles--answer .small.muted {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.arena .tile {
+  background: var(--surface);
+  color: var(--text);
+  border: none;
+  border-radius: 16px;
+  padding: 8px 16px;
+  min-height: 48px;
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.25);
+}
+
+/* Кнопки на цветном фоне. */
+.arena .btn {
+  background: #fff;
+  color: var(--arena-a);
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.35);
+}
+
+.arena .btn:disabled {
+  opacity: 0.55;
+}
+
+.arena .btn--secondary,
+.arena .btn--outline {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  box-shadow: none;
+}
+
+.arena .btn--ghost {
+  background: transparent;
+  color: #fff;
+  box-shadow: none;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.arena .card .btn--ghost,
+.arena .card .btn--outline {
+  color: var(--primary);
+  border-color: var(--border);
+  background: transparent;
+}
+
+.arena .card .btn:not(.btn--ghost):not(.btn--outline) {
+  background: var(--arena-a);
+  color: #fff;
+}
+
+.arena .sticky-footer {
+  background: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .arena .btn {
+    background: var(--surface);
+    color: #fff;
+  }
+}
+
+/* Микрофон: белая кнопка с цветной иконкой; во время записи — красная. */
+.arena .mic-btn:not(.listening) {
+  background: #fff;
+  color: var(--arena-a);
+  box-shadow:
+    0 0 0 8px var(--glass),
+    0 8px 24px -8px rgba(0, 0, 0, 0.3);
+}
+
+.arena .card .mic-btn:not(.listening) {
+  background: var(--arena-a);
+  color: #fff;
+  box-shadow: 0 8px 20px -8px var(--arena-a);
+}
+
+.arena .voice-bars span {
+  background: #fff;
+}
+
+.arena .card .voice-bars span {
+  background: var(--bad);
+}
+
+/* Диалог. */
+.arena .banner {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border-radius: 16px;
+}
+
+.arena .bubble--them {
+  background: var(--surface);
+}
+
+.arena .bubble--you {
+  background: rgba(0, 0, 0, 0.22);
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+.arena .bubble--you .muted {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.arena .chip--you {
+  background: var(--primary-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arena {
+    transition: none;
+  }
+}
