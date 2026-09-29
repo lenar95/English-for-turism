@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { PronunciationCheck } from '../components/PronunciationCheck';
 import { TripDetails, TripScenarioPicker } from '../components/TripEditor';
+import { scenarios } from '../data';
+import { plural } from '../lib/ru';
 import { useApp } from '../state/AppContext';
 
 export function OnboardingPage() {
@@ -24,7 +26,7 @@ export function OnboardingPage() {
           <h1>Английский в поездку</h1>
           <p className="muted">Для тех, кто едет за границу и не знает английского. Без грамматики и зубрёжки — только то, что пригодится в поездке.</p>
           <div className="card stack">
-            <div className="row"><span style={{ fontSize: 24, width: 32, flex: "none", textAlign: "center" }}>🗺</span><span><b>16 ситуаций</b> — от паспортного контроля и такси до аптеки и ресторана</span></div>
+            <div className="row"><span style={{ fontSize: 24, width: 32, flex: "none", textAlign: "center" }}>🗺</span><span><b>{scenarios.length} {plural(scenarios.length, 'ситуация', 'ситуации', 'ситуаций')}</b> — от паспортного контроля и такси до аптеки и ресторана</span></div>
             <div className="row"><span style={{ fontSize: 24, width: 32, flex: "none", textAlign: "center" }}>🔊</span><span><b>Живое звучание</b> и подсказка русскими буквами для каждой фразы</span></div>
             <div className="row"><span style={{ fontSize: 24, width: 32, flex: "none", textAlign: "center" }}>🎙</span><span><b>Проверка произношения</b> — говорите в микрофон, приложение покажет, какие слова звучат непонятно</span></div>
             <div className="row"><span style={{ fontSize: 24, width: 32, flex: "none", textAlign: "center" }}>🎯</span><span><b>Шкала готовности</b> — память и произношение по каждой ситуации</span></div>

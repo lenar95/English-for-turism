@@ -1,20 +1,23 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { TabBar } from './components/Layout';
 import { Toasts } from './components/Toasts';
 import { UpdateBanner } from './components/UpdateBanner';
-import { LocalPracticePage } from './pages/LocalPracticePage';
-import { CityPage } from './pages/CityPage';
-import { DialoguePage } from './pages/DialoguePage';
 import { HomePage } from './pages/HomePage';
 import { OnboardingPage } from './pages/OnboardingPage';
-import { PhrasebookPage } from './pages/PhrasebookPage';
-import { ProgressPage } from './pages/ProgressPage';
-import { ScenarioPage } from './pages/ScenarioPage';
-import { ScenariosPage } from './pages/ScenariosPage';
-import { SessionPage } from './pages/SessionPage';
-import { SettingsPage } from './pages/SettingsPage';
 import { AppProvider, useApp } from './state/AppContext';
+
+// Главная и онбординг — в основном чанке, остальные экраны подгружаются при первом переходе
+// (и всё равно попадают в офлайн-кэш при установке service worker'а).
+const ScenariosPage = lazy(() => import('./pages/ScenariosPage').then((m) => ({ default: m.ScenariosPage })));
+const ScenarioPage = lazy(() => import('./pages/ScenarioPage').then((m) => ({ default: m.ScenarioPage })));
+const CityPage = lazy(() => import('./pages/CityPage').then((m) => ({ default: m.CityPage })));
+const LocalPracticePage = lazy(() => import('./pages/LocalPracticePage').then((m) => ({ default: m.LocalPracticePage })));
+const DialoguePage = lazy(() => import('./pages/DialoguePage').then((m) => ({ default: m.DialoguePage })));
+const SessionPage = lazy(() => import('./pages/SessionPage').then((m) => ({ default: m.SessionPage })));
+const PhrasebookPage = lazy(() => import('./pages/PhrasebookPage').then((m) => ({ default: m.PhrasebookPage })));
+const ProgressPage = lazy(() => import('./pages/ProgressPage').then((m) => ({ default: m.ProgressPage })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -36,6 +39,7 @@ function Shell() {
   return (
     <>
       <ScrollToTop />
+      <Suspense fallback={null}>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/scenarios" element={<ScenariosPage />} />
@@ -50,6 +54,7 @@ function Shell() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
       {!focused && <TabBar />}
       <Toasts />
       <UpdateBanner />

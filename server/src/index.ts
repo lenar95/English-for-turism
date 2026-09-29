@@ -8,6 +8,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import webpush from 'web-push';
+import { forEachLimited, RateLimiter } from './ratelimit';
 import { decide, isAllowedEndpoint, localNow, type Message, type Snapshot, type Subscriber } from './schedule';
 import { Store } from './store';
 
@@ -17,6 +18,17 @@ const SUBJECT = process.env.VAPID_SUBJECT ?? 'https://engtrip.ru';
 const MAX_SUBSCRIBERS = 50000;
 /** Через сколько повторять отправку после временного сбоя (5xx, сеть). */
 const RETRY_MS = 10 * 60_000;
+/** Сколько уведомлений отправлять одновременно. */
+const SEND_CONCURRENCY = 8;
+/** Не больше стольких POST-запросов в минуту с одного адреса: подписки — редкое действие. */
+const limiter = new RateLimiter(30, 60_000);
+
+/** Адрес клиента: Caddy стоит впереди и передаёт X-Forwarded-For. */
+function clientKey(req: IncomingMessage): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim();
+  return first || req.socket.remoteAddress || 'unknown';
+}
 
 const store = new Store(DATA_DIR);
 
@@ -110,6 +122,7 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && url === '/api/health') return send(res, 200, { ok: true, subscribers: store.size });
     if (req.method === 'GET' && url === '/api/push/key') return send(res, 200, { publicKey: vapid!.publicKey });
     if (req.method !== 'POST') return send(res, 404, { error: 'not found' });
+    if (!limiter.allow(clientKey(req), Date.now())) return send(res, 429, { error: 'too many requests' });
 
     const body = await readBody(req);
     const id = str(body.id, 64);
@@ -180,22 +193,25 @@ const server = createServer(async (req, res) => {
 /** Раз в минуту проверяем, кому пора напомнить. День отмечаем отправленным только после отправки. */
 async function tick() {
   const now = Date.now();
-  for (const sub of store.all()) {
+  limiter.sweep(now);
+  const due = store.all().flatMap((sub) => {
     const msg = decide(sub, now);
-    if (!msg) continue;
+    return msg ? [{ sub, msg }] : [];
+  });
+  await forEachLimited(due, SEND_CONCURRENCY, async ({ sub, msg }) => {
     const result = await push(sub, msg);
-    if (result === 'gone') continue;
+    if (result === 'gone') return;
     if (result === 'retry') {
       sub.retryAt = now + RETRY_MS;
       store.set(sub);
-      continue;
+      return;
     }
     sub.lastSentDay = localNow(now, sub.tz).date;
     sub.variant = (sub.variant + 1) % 1000;
     sub.retryAt = undefined;
     store.set(sub);
     if (result === 'sent') console.log(`напоминание «${msg.type}» → ${sub.id.slice(0, 8)}`);
-  }
+  });
 }
 
 setInterval(() => void tick().catch((e) => console.error('tick', e)), 60_000);
