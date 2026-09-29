@@ -1,8 +1,12 @@
 name: Deploy web to GitHub Pages
 
+# Сайт живёт на VPS (см. web-build.yml), а GitHub Pages в репозитории не включён,
+# поэтому публикуем на Pages только вручную: Actions → Deploy web to GitHub Pages → Run workflow.
+# Чтобы публиковать автоматически, включите Pages (Settings → Pages → Source: GitHub Actions)
+# и верните триггер:
+#   push:
+#     branches: [main]
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

@@ -113,8 +113,10 @@ npm run build      # сборка в dist/
 
 ### Веб-версия на GitHub Pages
 
-Workflow `.github/workflows/pages.yml` публикует сайт при пуше в `main`. Один раз включите
-**Settings → Pages → Source: GitHub Actions**.
+Workflow `.github/workflows/pages.yml` запускается вручную (Actions → Deploy web to GitHub Pages → Run workflow):
+основной сайт живёт на VPS, а без включённого Pages автоматический запуск падал бы на каждом пуше. Чтобы публиковать
+на Pages автоматически, один раз включите **Settings → Pages → Source: GitHub Actions** и верните в `pages.yml`
+триггер `push` для `main` (он оставлен там в комментарии).
 
 ### Веб-версия на своём сервере (VPS)
 
