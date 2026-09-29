@@ -1,9 +1,8 @@
 import type { Scenario } from '../data/types';
 import type { AnswerEvent, SessionLog } from '../state/model';
+import { DAY, dayKey, dayStart, daysUntil, parseDay } from './dates';
 import { isDue, retention } from './memory';
 import type { ProgressMap } from './readiness';
-
-const DAY = 86400000;
 
 /**
  * Состояние ученика, оценённое по поведению.
@@ -36,16 +35,6 @@ export interface MotivationReading {
 export const TARGET_ACCURACY = 0.85;
 export const ACCURACY_BAND: [number, number] = [0.7, 0.95];
 
-export function dayStart(ts: number): number {
-  const d = new Date(ts);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
-
-function dayKeyToTs(key: string): number {
-  return new Date(`${key}T00:00:00`).getTime();
-}
-
 export function readMotivation(
   answers: AnswerEvent[],
   sessions: SessionLog[],
@@ -53,7 +42,7 @@ export function readMotivation(
   now: number,
 ): MotivationReading {
   const today = dayStart(now);
-  const days = activeDays.map(dayKeyToTs).filter((t) => !Number.isNaN(t));
+  const days = activeDays.map(parseDay).filter((t) => !Number.isNaN(t));
   const lastDay = days.length ? Math.max(...days) : null;
   const daysSinceLast = lastDay === null ? null : Math.round((today - lastDay) / DAY);
   const activeLast7 = days.filter((d) => d > today - 7 * DAY).length;
@@ -107,8 +96,7 @@ export function activeThisWeek(activeDays: string[], now: number): { count: numb
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    days.push(set.has(key));
+    days.push(set.has(dayKey(d.getTime())));
   }
   return { count: days.filter(Boolean).length, days };
 }
@@ -151,8 +139,7 @@ export function dailyPlan(
   const phrases = scenarios.flatMap((s) => s.phrases);
   const notSolid = phrases.filter((p) => (progress[p.id]?.memory.level ?? 0) < 3).length;
   const due = phrases.filter((p) => isDue(progress[p.id]?.memory, now)).length;
-  const date = tripDate ? new Date(`${tripDate}T00:00:00`).getTime() : NaN;
-  const daysLeft = Number.isNaN(date) ? null : Math.round((date - dayStart(now)) / DAY);
+  const daysLeft = daysUntil(tripDate, now);
   const done = answeredToday(answers, now);
 
   // Каждой новой фразе нужно ~3 задания в разные дни; повторения — по одному.

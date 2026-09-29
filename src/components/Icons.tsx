@@ -75,6 +75,3 @@ export const IconChat = (p: P) => (
 export const IconTarget = (p: P) => (
   <svg {...base} {...p}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" fill="currentColor" /></svg>
 );
-export const IconRefresh = (p: P) => (
-  <svg {...base} {...p}><path d="M20 11a8 8 0 0 0-14.9-3M4 5v4h4M4 13a8 8 0 0 0 14.9 3M20 19v-4h-4" /></svg>
-);

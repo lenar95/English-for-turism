@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { scenarios } from '../data';
 import type { AnswerEvent, SessionLog } from '../state/model';
-import { dayKey } from '../state/model';
+import { dayKey } from './dates';
 import { createAdaptiveSession, difficultyShift, isSuccess } from './adaptive';
 import { activeThisWeek, dailyPlan, readMotivation } from './motivation';
 

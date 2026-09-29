@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { scenarios } from '../data';
-import { buildExam, buildPracticeSession, isBuildCorrect, phraseWords } from './exercises';
+import { createAdaptiveSession, type OutcomeLike } from './adaptive';
+import { buildExam, isBuildCorrect, phraseWords } from './exercises';
 
 function seeded(seed: number) {
   return () => {
@@ -17,17 +18,20 @@ describe('упражнения', () => {
   });
 
   it('тренировка отдаёт нужное число заданий с корректными вариантами', () => {
-    const session = buildPracticeSession(scenarios.slice(0, 3), {}, Date.now(), true, 10, seeded(1));
-    expect(session).toHaveLength(10);
-    for (const ex of session) {
-      if (ex.options) {
+    const source = createAdaptiveSession(scenarios.slice(0, 3), {}, Date.now(), true, 10, 'normal', seeded(1));
+    const outcomes: OutcomeLike[] = [];
+    for (let ex = source.next(outcomes); ex; ex = source.next(outcomes)) outcomes.push({ exercise: ex, memoryCorrect: true });
+    expect(outcomes).toHaveLength(10);
+    for (const { exercise: ex } of outcomes) {
+      if (ex.type === 'choose-en' || ex.type === 'listen') {
         expect(ex.options).toHaveLength(4);
-        expect(ex.options.some((o) => o.id === ex.phrase.id)).toBe(true);
-        expect(new Set(ex.options.map((o) => o.en)).size).toBe(4);
+        expect(ex.options!.some((o) => o.id === ex.phrase.id)).toBe(true);
+        expect(new Set(ex.options!.map((o) => o.en)).size).toBe(4);
       }
-      // Новые фразы начинаются с узнавания.
-      expect(['choose-en', 'listen']).toContain(ex.type);
+      if (ex.type === 'build') expect(ex.tiles!.length).toBeGreaterThanOrEqual(3);
     }
+    // Новые фразы начинаются с узнавания; сложнее становится только после серии верных ответов.
+    expect(['choose-en', 'listen']).toContain(outcomes[0].exercise.type);
   });
 
   it('проверка сбалансирована: есть задания на слух, память и произношение', () => {

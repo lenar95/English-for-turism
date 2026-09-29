@@ -10,6 +10,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { STAGES, cities, scenarios } from '../src/data';
 import type { CityPack, Phrase, Scenario } from '../src/data/types';
+import { plural } from '../src/lib/ru';
 
 const SITE = (process.env.SITE_URL ?? 'https://engtrip.ru').replace(/\/$/, '');
 const OUT = process.env.OUT_DIR ?? 'dist';
@@ -17,14 +18,6 @@ const today = new Date().toISOString().slice(0, 10);
 
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-function plural(n: number, one: string, few: string, many: string): string {
-  const m10 = n % 10;
-  const m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return one;
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
-  return many;
-}
 
 const CSS = `
 :root{--bg:#f6f4ef;--surface:#fff;--text:#1c1f24;--muted:#5d6168;--primary:#1f5f8b;--soft:#e3eef6;--border:#e2ddd2;--them:#7a4fb5;--them-soft:#efe7fa;--accent:#c98a12}

@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { readinessLevel } from '../lib/readiness';
 
 /** Цвет прогресса: янтарный — в процессе, зелёный — готово. Красный оставляем для ошибок. */
 export function toneOf(value: number): 'mid' | 'good' {
@@ -54,9 +53,4 @@ export function Metric({ icon, label, value, disabled }: { icon?: ReactNode; lab
       {disabled ? <span className="tiny muted" style={{ gridColumn: '1 / -1' }}>{disabled}</span> : <Bar value={value} />}
     </div>
   );
-}
-
-export function LevelBadge({ total }: { total: number }) {
-  const level = readinessLevel(total);
-  return <span className={`level-badge tone-${level.tone}`}>{level.label}</span>;
 }

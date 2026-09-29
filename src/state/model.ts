@@ -1,5 +1,6 @@
-import { applyAnswer, type AnswerKind } from '../lib/memory';
-import { emptyPhraseProgress, pushPron, type PhraseProgress } from '../lib/progress';
+import { DAY, dayKey } from '../lib/dates';
+import { applyAnswer, MAX_LEVEL, type AnswerKind, type MemoryState } from '../lib/memory';
+import { emptyPhraseProgress, PRON_HISTORY, pushPron, type PhraseProgress } from '../lib/progress';
 import type { Accent } from '../lib/speech/tts';
 
 export interface Settings {
@@ -102,12 +103,6 @@ function pushAnswer(list: AnswerEvent[], ev: AnswerEvent): AnswerEvent[] {
   return [...list, ev].slice(-300);
 }
 
-export function dayKey(ts: number): string {
-  const d = new Date(ts);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
 function markActive(data: AppData, now: number): string[] {
   const today = dayKey(now);
   if (data.activeDays.includes(today)) return data.activeDays;
@@ -178,7 +173,6 @@ export function reducer(data: AppData, action: Action): AppData {
 /** Серия дней подряд с занятиями (включая сегодня или вчера). */
 export function streak(activeDays: string[], now: number): number {
   const set = new Set(activeDays);
-  const DAY = 86400000;
   let cursor = now;
   if (!set.has(dayKey(cursor))) cursor -= DAY;
   let n = 0;
@@ -189,24 +183,103 @@ export function streak(activeDays: string[], now: number): number {
   return n;
 }
 
-/** Мягкая миграция: добавить поля, появившиеся в новых версиях. */
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const isStr = (v: unknown): v is string => typeof v === 'string';
+const isObj = (v: unknown): v is Record<string, unknown> => Boolean(v) && typeof v === 'object';
+/** Целое неотрицательное число или запасное значение. */
+const count = (v: unknown, fallback = 0): number => (isNum(v) && v >= 0 ? Math.floor(v) : fallback);
+const list = <T>(v: unknown, fix: (x: unknown) => T | null): T[] =>
+  Array.isArray(v) ? v.map(fix).filter((x): x is T => x !== null) : [];
+const fixStr = (x: unknown): string | null => (isStr(x) ? x : null);
+const fixDay = (x: unknown): string | null => (isStr(x) && /^\d{4}-\d{2}-\d{2}$/.test(x) ? x : null);
+
+function fixProgress(raw: unknown): PhraseProgress | null {
+  if (!isObj(raw)) return null;
+  const m = isObj(raw.memory) ? raw.memory : {};
+  const memory: MemoryState = {
+    level: Math.min(MAX_LEVEL, count(m.level)),
+    last: count(m.last),
+    reviews: count(m.reviews),
+    correct: count(m.correct),
+  };
+  const pron = Array.isArray(raw.pron) ? raw.pron.filter((v): v is number => isNum(v) && v >= 0 && v <= 100) : [];
+  return { memory, pron: pron.slice(-PRON_HISTORY) };
+}
+
+const SESSION_KINDS: SessionKind[] = ['practice', 'minimal', 'warmup', 'exam', 'dialogue'];
+
+const fixAnswer = (x: unknown): AnswerEvent | null =>
+  isObj(x) && isNum(x.t) && isStr(x.phraseId) ? { t: x.t, phraseId: x.phraseId, ok: x.ok === true } : null;
+
+const fixExam = (x: unknown): ExamRecord | null =>
+  isObj(x) && isNum(x.at) && isNum(x.total)
+    ? {
+        at: x.at,
+        scenarioId: isStr(x.scenarioId) ? x.scenarioId : null,
+        total: x.total,
+        memory: isNum(x.memory) ? x.memory : x.total,
+        pronunciation: isNum(x.pronunciation) ? x.pronunciation : null,
+        questions: count(x.questions),
+      }
+    : null;
+
+const fixSession = (x: unknown): SessionLog | null =>
+  isObj(x) && isNum(x.start) && isNum(x.end)
+    ? {
+        start: x.start,
+        end: x.end,
+        kind: SESSION_KINDS.includes(x.kind as SessionKind) ? (x.kind as SessionKind) : 'practice',
+        planned: count(x.planned),
+        done: count(x.done),
+        correct: count(x.correct),
+        exitedEarly: x.exitedEarly === true,
+      }
+    : null;
+
+/**
+ * Мягкая миграция: добавить поля, появившиеся в новых версиях, и починить битые записи,
+ * чтобы повреждённое хранилище не роняло приложение и не обнуляло весь прогресс.
+ * Неизвестные поля (из будущих версий) сохраняются как есть.
+ */
 export function migrate(raw: unknown): AppData {
   const base = defaultData();
-  if (!raw || typeof raw !== 'object') return base;
-  const r = raw as Partial<AppData>;
+  if (!isObj(raw)) return base;
+  const trip = isObj(raw.trip) ? raw.trip : {};
+  const settings = isObj(raw.settings) ? raw.settings : {};
+  const progress: Record<string, PhraseProgress> = {};
+  if (isObj(raw.progress)) {
+    for (const [id, p] of Object.entries(raw.progress)) {
+      const fixed = fixProgress(p);
+      if (fixed) progress[id] = fixed;
+    }
+  }
+  const pushId =
+    isObj(raw.pushId) && isStr(raw.pushId.id) && isStr(raw.pushId.token) ? { id: raw.pushId.id, token: raw.pushId.token } : null;
   return {
     ...base,
-    ...r,
+    ...raw,
     version: 1,
-    trip: { ...base.trip, ...(r.trip ?? {}) },
-    settings: { ...base.settings, ...(r.settings ?? {}) },
-    progress: r.progress ?? {},
-    exams: r.exams ?? [],
-    activeDays: r.activeDays ?? [],
-    badges: r.badges ?? [],
-    answers: r.answers ?? [],
-    sessions: r.sessions ?? [],
-    weeklyGoal: r.weeklyGoal ?? 4,
-    pushId: r.pushId ?? null,
+    onboarded: raw.onboarded === true,
+    progress,
+    exams: list(raw.exams, fixExam).slice(-100),
+    trip: {
+      destination: fixStr(trip.destination) ?? '',
+      date: fixDay(trip.date) ?? '',
+      scenarioIds: list(trip.scenarioIds, fixStr),
+      cityId: fixStr(trip.cityId) ?? '',
+    },
+    settings: {
+      accent: settings.accent === 'en-GB' ? 'en-GB' : 'en-US',
+      showTranscription: typeof settings.showTranscription === 'boolean' ? settings.showTranscription : base.settings.showTranscription,
+      pronunciation: typeof settings.pronunciation === 'boolean' ? settings.pronunciation : base.settings.pronunciation,
+      reminders: settings.reminders === true,
+      reminderTime: isStr(settings.reminderTime) && /^\d{2}:\d{2}$/.test(settings.reminderTime) ? settings.reminderTime : base.settings.reminderTime,
+    },
+    activeDays: list(raw.activeDays, fixDay).slice(-60),
+    badges: list(raw.badges, fixStr),
+    answers: list(raw.answers, fixAnswer).slice(-300),
+    sessions: list(raw.sessions, fixSession).slice(-100),
+    weeklyGoal: isNum(raw.weeklyGoal) ? Math.max(1, Math.min(7, Math.round(raw.weeklyGoal))) : base.weeklyGoal,
+    pushId,
   };
 }

@@ -1,5 +1,4 @@
 import type { Phrase, Scenario } from '../data/types';
-import { isDue, memoryStrength } from './memory';
 import { pronunciationOf } from './progress';
 import type { ProgressMap } from './readiness';
 import { basicClean } from './text';
@@ -127,37 +126,6 @@ export function chooseType(
   }
   if (speechAvailable) return 'recall-speak';
   return canBuild ? 'build' : 'choose-en';
-}
-
-/**
- * Тренировка: сначала фразы, которые пора повторить, слабые и ключевые.
- */
-export function buildPracticeSession(
-  scenarios: Scenario[],
-  progress: ProgressMap,
-  now: number,
-  speechAvailable: boolean,
-  size = 10,
-  rng: Rng = Math.random,
-): Exercise[] {
-  const pool = locate(scenarios);
-  const ranked = pool
-    .map((l) => {
-      const p = progress[l.phrase.id];
-      const mem = memoryStrength(p?.memory, now);
-      const pron = pronunciationOf(p);
-      let priority = 1 - mem;
-      if (l.phrase.speaker === 'you' && speechAvailable) priority += (1 - (pron ?? 0) / 100) * 0.7;
-      if (l.phrase.key) priority += 0.3;
-      if (isDue(p?.memory, now)) priority += 0.5;
-      priority += rng() * 0.4;
-      return { l, priority };
-    })
-    .sort((a, b) => b.priority - a.priority)
-    .slice(0, size);
-  return shuffle(ranked, rng).map(({ l }) =>
-    makeExercise(chooseType(l.phrase, progress, speechAvailable, rng), l, pool, rng),
-  );
 }
 
 /**

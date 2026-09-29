@@ -1,7 +1,6 @@
-import { ACCURACY_BAND, STATE_TEXT, TARGET_ACCURACY, dayStart, type MotivationReading } from '../lib/motivation';
+import { DAY, dayKey, dayStart } from '../lib/dates';
+import { ACCURACY_BAND, STATE_TEXT, TARGET_ACCURACY, type MotivationReading } from '../lib/motivation';
 import type { AnswerEvent, SessionLog } from '../state/model';
-
-const DAY = 86400000;
 
 /**
  * «Как идёт обучение» — показания датчиков системы мотивации:
@@ -24,9 +23,7 @@ export function LearningHealth({
   const today = dayStart(now);
   const set = new Set(activeDays);
   const last14 = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date(today - (13 - i) * DAY);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    return set.has(key);
+    return set.has(dayKey(today - (13 - i) * DAY));
   });
 
   // Точность по дням за 14 дней — видно, держится ли она в коридоре.

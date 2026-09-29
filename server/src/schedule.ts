@@ -7,6 +7,8 @@
  * - текст зависит от ситуации и чередуется, чтобы не приедался.
  */
 
+import { plural } from '../../src/lib/ru';
+
 export interface Snapshot {
   /** Последний день занятий по местному времени, YYYY-MM-DD. */
   lastActiveDay: string | null;
@@ -101,14 +103,6 @@ const URLS: Record<Exclude<MessageType, 'test'>, string> = {
   today: '/#/phrasebook',
   trip: '/#/phrasebook',
 };
-
-function plural(n: number, one: string, few: string, many: string): string {
-  const m10 = n % 10;
-  const m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return one;
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
-  return many;
-}
 
 /** Решить, отправлять ли напоминание сейчас. null — не отправлять. */
 export function decide(sub: Subscriber, now: number): Message | null {

@@ -5,18 +5,11 @@ import { RouteMap } from '../components/RouteMap';
 import { TodayPlan, WeekDots } from '../components/TodayPlan';
 import { stageStyle } from '../components/stage';
 import { cities, cityById } from '../data';
+import { daysUntil } from '../lib/dates';
 import { activeThisWeek, dailyPlan, readMotivation, rememberedShare } from '../lib/motivation';
 import { pushSupport } from '../lib/push';
 import { scenarioReadiness, tripReadiness } from '../lib/readiness';
 import { useApp } from '../state/AppContext';
-
-function daysUntil(date: string, now: number): number | null {
-  if (!date) return null;
-  const target = new Date(`${date}T00:00:00`).getTime();
-  if (Number.isNaN(target)) return null;
-  const today = new Date(new Date(now).toDateString()).getTime();
-  return Math.round((target - today) / 86400000);
-}
 
 function greeting(now: number): string {
   const h = new Date(now).getHours();
