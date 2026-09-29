@@ -2453,3 +2453,21 @@ details[open] summary .chev {
   border-color: var(--stage);
   background: color-mix(in srgb, var(--stage) 8%, var(--surface));
 }
+
+/* Предложение обновиться: над панелью вкладок, не мешает тренировке. */
+.update-banner {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  z-index: 190;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 10px 16px;
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e2ddd2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  font-size: 14px;
+}

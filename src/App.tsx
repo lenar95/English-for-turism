@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { TabBar } from './components/Layout';
 import { Toasts } from './components/Toasts';
+import { UpdateBanner } from './components/UpdateBanner';
 import { LocalPracticePage } from './pages/LocalPracticePage';
 import { CityPage } from './pages/CityPage';
 import { DialoguePage } from './pages/DialoguePage';
@@ -47,6 +48,7 @@ function Shell() {
       </Routes>
       {!focused && <TabBar />}
       <Toasts />
+      <UpdateBanner />
     </>
   );
 }

@@ -5,7 +5,17 @@ import { allBadges, type Badge } from '../lib/badges';
 import { hapticSuccess } from '../lib/haptics';
 import type { AnswerKind } from '../lib/memory';
 import { freezePlan, planIsCurrent, todayPlan, type DailyPlan } from '../lib/motivation';
-import { newIdentity, probeBackend, registerServiceWorker, sendStatus, type BackendState, type PushIdentity, type PushSnapshot } from '../lib/push';
+import {
+  applyUpdate,
+  newIdentity,
+  onUpdateReady,
+  probeBackend,
+  registerServiceWorker,
+  sendStatus,
+  type BackendState,
+  type PushIdentity,
+  type PushSnapshot,
+} from '../lib/push';
 import { recognitionAvailable, recognitionLikelyAvailable } from '../lib/speech/recognition';
 import { defaultData, reducer, streak, type AppData, type ExamRecord, type SessionLog, type Settings, type Trip } from './model';
 import { loadData, saveData } from './storage';
@@ -38,6 +48,9 @@ interface AppContextValue {
   ensurePushId(): PushIdentity;
   /** Сводка для сервера напоминаний: без личных данных, только цифры плана. */
   pushSnapshot(): PushSnapshot;
+  /** Скачана новая версия приложения; applyUpdate включает её и перезагружает страницу. */
+  updateReady: boolean;
+  applyUpdate(): void;
 }
 
 const Ctx = createContext<AppContextValue | null>(null);
@@ -126,8 +139,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [ready, data.progress, data.exams, data.activeDays, data.badges, tripScenarios, speechSupported]);
   const dismissToast = useCallback((id: string) => setToasts((t) => t.filter((b) => b.id !== id)), []);
 
+  const [updateReady, setUpdateReady] = useState(false);
   useEffect(() => {
     void registerServiceWorker();
+    return onUpdateReady(() => setUpdateReady(true));
   }, []);
 
   const pushSnapshot = useCallback((): PushSnapshot => {
@@ -178,6 +193,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dismissToast,
     ensurePushId,
     pushSnapshot,
+    updateReady,
+    applyUpdate,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

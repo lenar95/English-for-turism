@@ -22,6 +22,8 @@ jobs:
       - run: npm run knip
       - run: npm test
       - run: npm run build
+      - name: Офлайн-режим (service worker) в Chrome
+        run: npm run test:offline
       - uses: actions/upload-artifact@v4
         with:
           name: web-dist

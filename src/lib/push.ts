@@ -42,10 +42,60 @@ export function probeBackend(): Promise<BackendState> {
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!('serviceWorker' in navigator) || Capacitor.isNativePlatform()) return null;
   try {
-    return await navigator.serviceWorker.register('./sw.js');
+    const reg = await navigator.serviceWorker.register('./sw.js');
+    watchUpdates(reg);
+    return reg;
   } catch {
     return null;
   }
+}
+
+type UpdateListener = () => void;
+const updateListeners = new Set<UpdateListener>();
+let waitingWorker: ServiceWorker | null = null;
+let watched: ServiceWorkerRegistration | null = null;
+
+/**
+ * Новая версия установлена и ждёт своей очереди — сообщаем странице, чтобы она предложила
+ * обновиться. Установленное на экран «Домой» приложение редко перезагружается само, поэтому
+ * при возвращении в него проверяем обновления вручную.
+ */
+function watchUpdates(reg: ServiceWorkerRegistration): void {
+  if (watched === reg) return;
+  watched = reg;
+  const announce = (worker: ServiceWorker | null) => {
+    // Без controller это первая установка, а не обновление.
+    if (!worker || !navigator.serviceWorker.controller) return;
+    waitingWorker = worker;
+    updateListeners.forEach((listener) => listener());
+  };
+  announce(reg.waiting);
+  reg.addEventListener('updatefound', () => {
+    const worker = reg.installing;
+    worker?.addEventListener('statechange', () => {
+      if (worker.state === 'installed') announce(worker);
+    });
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) void reg.update().catch(() => undefined);
+  });
+}
+
+/** Подписаться на появление ждущей версии; если она уже есть, слушатель вызывается сразу. */
+export function onUpdateReady(listener: UpdateListener): () => void {
+  updateListeners.add(listener);
+  if (waitingWorker) listener();
+  return () => updateListeners.delete(listener);
+}
+
+/** Включить ждущую версию и перезагрузить страницу, когда та возьмёт управление. */
+export function applyUpdate(): void {
+  if (!waitingWorker) {
+    location.reload();
+    return;
+  }
+  navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true });
+  waitingWorker.postMessage({ type: 'SKIP_WAITING' });
 }
 
 function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
