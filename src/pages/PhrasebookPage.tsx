@@ -16,7 +16,8 @@ export function PhrasebookPage() {
       if (scenarioId && scenario.id !== scenarioId) return false;
       if (keyOnly && !phrase.key) return false;
       if (!query) return true;
-      return [phrase.en, phrase.ru, phrase.tr, ...(phrase.alt ?? []), phrase.local?.text ?? '', phrase.local?.tr ?? ''].some((t) => norm(t).includes(query));
+      const translations = Object.values(phrase.translations ?? {}).flatMap((t) => [t.text, t.tr]);
+      return [phrase.en, phrase.ru, phrase.tr, ...(phrase.alt ?? []), ...translations].some((t) => norm(t).includes(query));
     });
   }, [q, scenarioId, keyOnly]);
 

@@ -1,13 +1,14 @@
+import { translationOf } from '../data';
 import type { CityPack, Phrase } from '../data/types';
 import { isDue, memoryStrength } from './memory';
 import type { PhraseProgress } from './progress';
 
 /**
  * Тренировка фраз на местном языке города (например, по-турецки).
- * Прогресс хранится отдельно от английского — под ключом `<id фразы>@local`,
- * поэтому на готовность к поездке (английский) он не влияет.
+ * Прогресс хранится отдельно от английского — под ключом `<id фразы>@<язык>`
+ * (например, `istanbul-transport-01@tr-TR`), поэтому на готовность к поездке он не влияет.
  */
-export const localProgressKey = (phraseId: string) => `${phraseId}@local`;
+export const localProgressKey = (phraseId: string, lang: string) => `${phraseId}@${lang}`;
 
 /** С какого уровня памяти фразу нужно вспоминать самому, а не повторять за диктором. */
 export const LOCAL_RECALL_LEVEL = 2;
@@ -41,10 +42,13 @@ export function localSession(
   scenarioId?: string,
   now: number = Date.now(),
 ): LocalItem[] {
+  const { lang } = city.localLanguage;
   const pool: Located[] = city.scenarios
     .filter((s) => !scenarioId || s.id === scenarioId)
-    .flatMap((s) => s.phrases.filter((p) => p.speaker === 'you' && p.local).map((phrase, order) => ({ phrase, scenarioId: s.id, order })));
-  const memoryOf = (p: Phrase) => progress[localProgressKey(p.id)]?.memory;
+    .flatMap((s) =>
+      s.phrases.filter((p) => p.speaker === 'you' && translationOf(p, lang)).map((phrase, order) => ({ phrase, scenarioId: s.id, order })),
+    );
+  const memoryOf = (p: Phrase) => progress[localProgressKey(p.id, lang)]?.memory;
   const byKeyThenOrder = (a: Located, b: Located) => Number(Boolean(b.phrase.key)) - Number(Boolean(a.phrase.key)) || a.order - b.order;
 
   const fresh = pool.filter((x) => !(memoryOf(x.phrase)?.reviews ?? 0)).sort(byKeyThenOrder);
@@ -72,8 +76,9 @@ export function localLearned(
   city: CityPack,
   progress: Record<string, PhraseProgress>,
 ): { started: number; learned: number; total: number } {
-  const phrases = city.scenarios.flatMap((s) => s.phrases.filter((p) => p.speaker === 'you' && p.local));
-  const level = (id: string) => progress[localProgressKey(id)]?.memory.level ?? 0;
+  const { lang } = city.localLanguage;
+  const phrases = city.scenarios.flatMap((s) => s.phrases.filter((p) => p.speaker === 'you' && translationOf(p, lang)));
+  const level = (id: string) => progress[localProgressKey(id, lang)]?.memory.level ?? 0;
   return {
     started: phrases.filter((p) => level(p.id) >= 1).length,
     learned: phrases.filter((p) => level(p.id) >= 3).length,

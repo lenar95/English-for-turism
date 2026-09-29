@@ -97,7 +97,8 @@ const crumbs = (items: { name: string; path: string }[]) => ({
 });
 
 function phraseCard(p: Phrase, city?: CityPack): string {
-  const loc = city && p.local ? city.localLanguage : null;
+  const local = city ? p.translations?.[city.localLanguage.lang] : undefined;
+  const loc = city && local ? city.localLanguage : null;
   return `<div class="card phrase">
 <div><span class="tag${p.speaker === 'them' ? ' them' : ''}">${p.speaker === 'you' ? 'Говорите вы' : 'Говорят вам'}</span>${p.key ? ' <span class="key">★</span>' : ''}</div>
 <button class="say" type="button" data-text="${esc(p.en)}" aria-label="Прослушать">🔊</button>
@@ -105,8 +106,8 @@ function phraseCard(p: Phrase, city?: CityPack): string {
 <div class="tr">${esc(p.tr)}</div>
 <div class="ru">${esc(p.ru)}</div>
 ${
-  loc && p.local
-    ? `<div class="local"><button class="say" type="button" data-lang="${loc.lang}" data-text="${esc(p.local.text)}" aria-label="Прослушать ${esc(loc.name)}">🔊</button><div class="small">${esc(loc.name)}</div><div class="en" lang="${loc.lang.slice(0, 2)}">${esc(p.local.text)}</div><div class="tr">${esc(p.local.tr)}</div></div>`
+  loc && local
+    ? `<div class="local"><button class="say" type="button" data-lang="${loc.lang}" data-text="${esc(local.text)}" aria-label="Прослушать ${esc(loc.name)}">🔊</button><div class="small">${esc(loc.name)}</div><div class="en" lang="${loc.lang.slice(0, 2)}">${esc(local.text)}</div><div class="tr">${esc(local.tr)}</div></div>`
     : ''
 }
 ${p.note ? `<div class="note">💡 ${esc(p.note)}</div>` : ''}

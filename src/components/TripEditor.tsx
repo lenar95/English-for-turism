@@ -5,13 +5,15 @@ import { stageStyle } from './stage';
 /** Выбор ситуаций, которые понадобятся в поездке. */
 export function TripScenarioPicker() {
   const { data, updateTrip } = useApp();
-  const selected = data.trip.scenarioIds.length ? data.trip.scenarioIds : scenarios.map((s) => s.id);
+  const selected = data.trip.allScenarios ? scenarios.map((s) => s.id) : data.trip.scenarioIds;
   const toggle = (id: string) => {
     const next = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id];
-    // Храним в порядке маршрута. Пустой выбор не допускаем.
+    // Храним в порядке маршрута. Пустой выбор не допускаем. Если отмечены все — включаем режим «все»,
+    // чтобы новые ситуации из будущих версий добавлялись сами.
     const ordered = scenarios.map((s) => s.id).filter((x) => next.includes(x));
     if (!ordered.length) return;
-    updateTrip({ scenarioIds: ordered.length === scenarios.length ? [] : ordered });
+    const all = ordered.length === scenarios.length;
+    updateTrip({ allScenarios: all, scenarioIds: all ? [] : ordered });
   };
   return (
     <div className="stack">

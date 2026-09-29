@@ -20,7 +20,9 @@ export interface Trip {
   destination: string;
   /** Дата вылета, YYYY-MM-DD. */
   date: string;
-  /** Выбранные ситуации. Пустой список = все. */
+  /** Все общие ситуации (новые добавляются автоматически). Иначе действует scenarioIds. */
+  allScenarios: boolean;
+  /** Выбранные общие ситуации, когда allScenarios выключен. */
   scenarioIds: string[];
   /** Городской набор (например, istanbul). Пустая строка — без города. */
   cityId: string;
@@ -100,7 +102,7 @@ export const defaultData = (): AppData => ({
   onboarded: false,
   progress: {},
   exams: [],
-  trip: { destination: '', date: '', scenarioIds: [], cityId: '' },
+  trip: { destination: '', date: '', allScenarios: true, scenarioIds: [], cityId: '' },
   settings: { accent: 'en-US', showTranscription: true, pronunciation: true, reminders: false, reminderTime: '19:00' },
   activeDays: [],
   badges: [],
@@ -283,7 +285,9 @@ export function migrate(raw: unknown): AppData {
   if (isObj(raw.progress)) {
     for (const [id, p] of Object.entries(raw.progress)) {
       const fixed = fixProgress(p);
-      if (fixed) progress[id] = fixed;
+      // До появления переводов на несколько языков местный прогресс хранился под `@local`;
+      // единственным местным языком тогда был турецкий.
+      if (fixed) progress[id.endsWith('@local') ? `${id.slice(0, -'@local'.length)}@tr-TR` : id] = fixed;
     }
   }
   const pushId =
@@ -298,6 +302,8 @@ export function migrate(raw: unknown): AppData {
     trip: {
       destination: fixStr(trip.destination) ?? '',
       date: fixDay(trip.date) ?? '',
+      // Раньше «все ситуации» кодировались пустым списком.
+      allScenarios: typeof trip.allScenarios === 'boolean' ? trip.allScenarios : list(trip.scenarioIds, fixStr).length === 0,
       scenarioIds: list(trip.scenarioIds, fixStr),
       cityId: fixStr(trip.cityId) ?? '',
     },

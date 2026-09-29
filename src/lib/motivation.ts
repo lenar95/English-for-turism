@@ -179,7 +179,7 @@ export function dailyPlan(
 
 /** Отпечаток поездки: при его смене план на день считается заново. */
 export function tripKey(trip: Trip): string {
-  return `${trip.date}|${trip.cityId}|${trip.scenarioIds.join(',')}`;
+  return `${trip.date}|${trip.cityId}|${trip.allScenarios ? '*' : trip.scenarioIds.join(',')}`;
 }
 
 /** Слепок плана для хранения на день. */

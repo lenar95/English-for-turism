@@ -15,7 +15,7 @@ import { shopping } from './scenarios/shopping';
 import { sightseeing } from './scenarios/sightseeing';
 import { transfer } from './scenarios/transfer';
 import { istanbul } from './cities/istanbul';
-import type { CityPack, Phrase, Scenario, Stage } from './types';
+import type { CityPack, LocalPhrase, Phrase, Scenario, Stage } from './types';
 
 /** Сценарии в порядке маршрута поездки. */
 export const scenarios: Scenario[] = [
@@ -76,11 +76,17 @@ export interface LocalVersion {
   name: string;
 }
 
-/** Фраза на местном языке города, если она есть в наборе. */
+/** Перевод фразы на язык с кодом lang, если он есть. */
+export function translationOf(phrase: Phrase, lang: string): LocalPhrase | undefined {
+  return phrase.translations?.[lang];
+}
+
+/** Фраза на местном языке своего города, если она есть в наборе. */
 export function localOf(phrase: Phrase): LocalVersion | null {
-  if (!phrase.local) return null;
   const cityId = phraseById[phrase.id]?.scenario.cityId;
   const city = cityId ? cityById[cityId] : undefined;
   if (!city) return null;
-  return { ...phrase.local, lang: city.localLanguage.lang, name: city.localLanguage.name };
+  const local = translationOf(phrase, city.localLanguage.lang);
+  if (!local) return null;
+  return { ...local, lang: city.localLanguage.lang, name: city.localLanguage.name };
 }

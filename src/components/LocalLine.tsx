@@ -38,7 +38,7 @@ export function LocalLine({ local, phraseId, canSpeak }: { local: LocalVersion; 
           lang={local.lang}
           compact
           idleHint={`Нажмите и скажите ${local.name}`}
-          onResult={(r) => pronunciation(localProgressKey(phraseId), r.score)}
+          onResult={(r) => pronunciation(localProgressKey(phraseId, local.lang), r.score)}
         />
       )}
     </div>

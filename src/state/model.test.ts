@@ -105,7 +105,7 @@ describe('migrate', () => {
     const d = migrate({ version: 0, onboarded: true, trip: { destination: 'Рим' }, settings: { accent: 'en-GB' }, weeklyGoal: 5.4 });
     expect(d.version).toBe(1);
     expect(d.onboarded).toBe(true);
-    expect(d.trip).toEqual({ destination: 'Рим', date: '', scenarioIds: [], cityId: '' });
+    expect(d.trip).toEqual({ destination: 'Рим', date: '', allScenarios: true, scenarioIds: [], cityId: '' });
     expect(d.settings).toEqual({ accent: 'en-GB', showTranscription: true, pronunciation: true, reminders: false, reminderTime: '19:00' });
     expect(d.weeklyGoal).toBe(5);
     expect(d.answers).toEqual([]);
@@ -154,9 +154,16 @@ describe('migrate', () => {
     expect(d.sessions[1]).toMatchObject({ kind: 'practice', planned: 0, exitedEarly: false });
     expect(d.activeDays).toEqual(['2026-06-01']);
     expect(d.badges).toEqual(['a']);
-    expect(d.trip).toEqual({ destination: '', date: '', scenarioIds: ['basics'], cityId: '' });
+    // Старые данные: непустой список ситуаций означал «выбраны только эти».
+    expect(d.trip).toEqual({ destination: '', date: '', allScenarios: false, scenarioIds: ['basics'], cityId: '' });
     expect(d.settings).toMatchObject({ accent: 'en-US', reminderTime: '19:00', showTranscription: true });
     expect(d.pushId).toBeNull();
+  });
+
+  it('местный прогресс под старым ключом @local переезжает на @tr-TR', () => {
+    const d = migrate({ progress: { 'istanbul-transport-01@local': { memory: { level: 2, last: 1, reviews: 2, correct: 2 }, pron: [] } } });
+    expect(d.progress['istanbul-transport-01@local']).toBeUndefined();
+    expect(d.progress['istanbul-transport-01@tr-TR']?.memory.level).toBe(2);
   });
 
   it('не выбрасывает неизвестные поля будущих версий', () => {

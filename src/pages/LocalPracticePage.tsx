@@ -6,7 +6,7 @@ import { PronunciationCheck } from '../components/PronunciationCheck';
 import { Ring } from '../components/Readiness';
 import { SessionFrame } from '../components/SessionFrame';
 import { SpeakButtons } from '../components/Speak';
-import { cityById } from '../data';
+import { cityById, translationOf } from '../data';
 import type { CityPack } from '../data/types';
 import { RECALL_PASS_SCORE } from '../lib/thresholds';
 import { hapticSuccess } from '../lib/haptics';
@@ -68,7 +68,7 @@ function LocalRun({ city, scenarioId, onRestart }: { city: CityPack; scenarioId?
 
   const next = () => {
     if (!current) return;
-    const key = localProgressKey(current.item.phrase.id);
+    const key = localProgressKey(current.item.phrase.id, lang.lang);
     if (current.memory !== null) answer(key, current.memory, current.item.mode === 'recall' ? 'recall' : 'recognition');
     if (current.pronScore !== undefined) pronunciation(key, current.pronScore);
     const all = [...outcomes, current];
@@ -125,7 +125,7 @@ function LocalCard({
   onAnswered: (o: LocalOutcome | null) => void;
 }) {
   const { phrase } = item;
-  const local = phrase.local!;
+  const local = translationOf(phrase, lang)!;
   const recall = item.mode === 'recall';
   // Подсказки в режиме «вспомнить»: 1 — произношение русскими буквами, 2 — вся фраза с озвучкой.
   const [hint, setHint] = useState(recall ? 0 : 2);

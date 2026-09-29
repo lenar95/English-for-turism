@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cityById } from '../data';
+import { cityById, translationOf } from '../data';
 import { localLearned, localProgressKey, localSession, LOCAL_NEW_PER_SESSION } from './localPractice';
 import { scorePronunciation } from './pronunciation';
 import { applyAnswer, emptyMemory } from './memory';
@@ -32,7 +32,7 @@ describe('турецкий: нормализация и оценка', () => {
   it('каждая турецкая фраза, прочитанная точно, получает 100%', () => {
     for (const s of istanbul.scenarios)
       for (const p of s.phrases)
-        if (p.local) expect(scorePronunciation([p.local.text], [p.local.text.replace(/[.,!?]/g, '')], 'tr').score, p.id).toBe(100);
+        for (const t of [translationOf(p, 'tr-TR')].filter(Boolean)) expect(scorePronunciation([t!.text], [t!.text.replace(/[.,!?]/g, '')], 'tr').score, p.id).toBe(100);
   });
 
   it('другая фраза получает низкую оценку', () => {
@@ -44,14 +44,14 @@ describe('тренировка на местном языке', () => {
   it('только фразы туриста с переводом, сначала новые', () => {
     const items = localSession(istanbul, {}, 8);
     expect(items).toHaveLength(8);
-    expect(items.every((i) => i.phrase.speaker === 'you' && i.phrase.local && i.mode === 'repeat')).toBe(true);
+    expect(items.every((i) => i.phrase.speaker === 'you' && translationOf(i.phrase, 'tr-TR') && i.mode === 'repeat')).toBe(true);
     expect(items[0].phrase.key).toBe(true);
   });
 
   it('освоенную фразу нужно вспомнить самому, и она идёт перед новыми', () => {
     const first = localSession(istanbul, {}, 1, undefined, NOW)[0].phrase;
     const learned = { ...emptyPhraseProgress(), memory: { ...emptyMemory(), level: 3, last: NOW, due: NOW + 7 * DAY, reviews: 3, correct: 3 } };
-    const progress = { [localProgressKey(first.id)]: learned };
+    const progress = { [localProgressKey(first.id, 'tr-TR')]: learned };
     const all = localSession(istanbul, progress, 100, undefined, NOW);
     expect(all[0].phrase.id).toBe(first.id);
     expect(all[0].mode).toBe('recall');
@@ -62,7 +62,7 @@ describe('тренировка на местном языке', () => {
   it('фраза, разученная вчера, возвращается раньше новых', () => {
     const session = localSession(istanbul, {}, 8, undefined, NOW - DAY);
     const yesterday = session[5].phrase;
-    const progress = { [localProgressKey(yesterday.id)]: { ...emptyPhraseProgress(), memory: applyAnswer(emptyMemory(), true, 'recognition', true, NOW - DAY) } };
+    const progress = { [localProgressKey(yesterday.id, 'tr-TR')]: { ...emptyPhraseProgress(), memory: applyAnswer(emptyMemory(), true, 'recognition', true, NOW - DAY) } };
     const items = localSession(istanbul, progress, 8, undefined, NOW);
     expect(items[0].phrase.id).toBe(yesterday.id);
     expect(items[0].mode).toBe('repeat');
@@ -72,10 +72,10 @@ describe('тренировка на местном языке', () => {
   it('когда есть что повторять, новых фраз за сессию немного', () => {
     const progress: Record<string, PhraseProgress> = {};
     for (const item of localSession(istanbul, {}, 10, undefined, NOW - DAY)) {
-      progress[localProgressKey(item.phrase.id)] = { ...emptyPhraseProgress(), memory: applyAnswer(emptyMemory(), true, 'recognition', true, NOW - DAY) };
+      progress[localProgressKey(item.phrase.id, 'tr-TR')] = { ...emptyPhraseProgress(), memory: applyAnswer(emptyMemory(), true, 'recognition', true, NOW - DAY) };
     }
     const items = localSession(istanbul, progress, 8, undefined, NOW);
-    const fresh = items.filter((i) => !progress[localProgressKey(i.phrase.id)]);
+    const fresh = items.filter((i) => !progress[localProgressKey(i.phrase.id, 'tr-TR')]);
     expect(fresh).toHaveLength(LOCAL_NEW_PER_SESSION);
     expect(items).toHaveLength(8);
   });

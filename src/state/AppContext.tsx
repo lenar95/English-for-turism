@@ -104,13 +104,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [data]);
 
   const tripScenarios = useMemo(() => {
-    const ids = data.trip.scenarioIds;
-    const general = ids.length
-      ? ids.map((id) => scenarioById[id]).filter((s): s is Scenario => Boolean(s))
-      : scenarios;
+    const general = data.trip.allScenarios
+      ? scenarios
+      : data.trip.scenarioIds.map((id) => scenarioById[id]).filter((s): s is Scenario => Boolean(s));
     const city = cityById[data.trip.cityId];
     return city ? [...general, ...city.scenarios] : general;
-  }, [data.trip.scenarioIds, data.trip.cityId]);
+  }, [data.trip.allScenarios, data.trip.scenarioIds, data.trip.cityId]);
 
   const speechOn = speechSupported && data.settings.pronunciation;
 

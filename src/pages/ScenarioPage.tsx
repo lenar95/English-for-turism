@@ -5,7 +5,7 @@ import { TopBar } from '../components/Layout';
 import { PhraseCard } from '../components/PhraseCard';
 import { Metric, Ring } from '../components/Readiness';
 import { stageStyle } from '../components/stage';
-import { cityById, scenarioById } from '../data';
+import { cityById, scenarioById, translationOf } from '../data';
 import { scenarioReadiness } from '../lib/readiness';
 import { useApp } from '../state/AppContext';
 import { useNow } from '../state/useNow';
@@ -67,7 +67,7 @@ export function ScenarioPage() {
             <IconTarget /> Проверка
           </Link>
         </div>
-        {city && scenario.phrases.some((p) => p.local) && (
+        {city && scenario.phrases.some((p) => translationOf(p, city.localLanguage.lang)) && (
           <Link to={`/city/${city.id}/local?s=${scenario.id}`} className="btn btn--outline btn--block">
             {city.emoji} Тренировка {city.localLanguage.name}
           </Link>

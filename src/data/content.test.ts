@@ -55,17 +55,18 @@ describe('контент', () => {
         }
   });
 
-  it('перевод на местный язык есть у каждой фразы городского набора и только там', () => {
+  it('у каждой фразы городского набора есть перевод на язык города; любые переводы заполнены', () => {
     for (const s of scenarios)
       for (const p of s.phrases) {
-        if (!s.cityId) {
-          expect(p.local, p.id).toBeUndefined();
-          continue;
+        for (const [lang, t] of Object.entries(p.translations ?? {})) {
+          expect(lang, p.id).toMatch(/^[a-z]{2}-[A-Z]{2}$/);
+          expect(t.text.trim(), p.id).not.toBe('');
+          expect(t.tr, p.id).not.toMatch(/[A-Za-z]/);
         }
-        expect(p.local, p.id).toBeDefined();
-        expect(p.local!.text.trim(), p.id).not.toBe('');
-        expect(p.local!.tr, p.id).not.toMatch(/[A-Za-z]/);
-        expect(localOf(p)?.lang, p.id).toBe(cities.find((c) => c.id === s.cityId)!.localLanguage.lang);
+        if (!s.cityId) continue;
+        const city = cities.find((c) => c.id === s.cityId)!;
+        expect(p.translations?.[city.localLanguage.lang], p.id).toBeDefined();
+        expect(localOf(p)?.lang, p.id).toBe(city.localLanguage.lang);
       }
   });
 });
