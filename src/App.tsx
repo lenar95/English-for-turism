@@ -18,7 +18,11 @@ import { AppProvider, useApp } from './state/AppContext';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  // Тело в фигурных скобках намеренно: эффект не должен возвращать результат scrollTo,
+  // иначе React примет его за функцию очистки (в Chrome это значение не undefined и страница падает).
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   return null;
 }
 
