@@ -9,6 +9,8 @@ export function OnboardingPage() {
   const steps = 3;
 
   return (
+    // Первое впечатление — яркая «арена», как экраны тренировки; цвет плавно меняется от шага к шагу.
+    <div className={`arena arena--onb-${step}`}>
     <div className="page page--bare onboarding">
       <div className="steps" aria-label={`Шаг ${step + 1} из ${steps}`}>
         {Array.from({ length: steps }, (_, i) => (
@@ -18,7 +20,7 @@ export function OnboardingPage() {
 
       {step === 0 && (
         <div className="stack" style={{ paddingTop: 24 }}>
-          <div className="big-emoji" aria-hidden>✈️</div>
+          <div className="big-emoji onb-plane" aria-hidden>✈️</div>
           <h1>Английский в поездку</h1>
           <p className="muted">Для тех, кто едет за границу и не знает английского. Без грамматики и зубрёжки — только то, что пригодится в поездке.</p>
           <div className="card stack">
@@ -34,7 +36,9 @@ export function OnboardingPage() {
         <div className="stack" style={{ paddingTop: 16 }}>
           <h1>Ваша поездка</h1>
           <p className="muted">Отметьте, что вам пригодится. Потом это можно изменить в настройках.</p>
-          <TripDetails />
+          <div className="card">
+            <TripDetails />
+          </div>
           <TripScenarioPicker />
         </div>
       )}
@@ -95,6 +99,7 @@ export function OnboardingPage() {
           </button>
         )}
       </div>
+    </div>
     </div>
   );
 }

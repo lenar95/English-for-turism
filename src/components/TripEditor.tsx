@@ -1,5 +1,6 @@
 import { STAGES, cities, scenarios } from '../data';
 import { useApp } from '../state/AppContext';
+import { stageStyle } from './stage';
 
 /** Выбор ситуаций, которые понадобятся в поездке. */
 export function TripScenarioPicker() {
@@ -22,9 +23,9 @@ export function TripScenarioPicker() {
             .map((s) => {
               const on = selected.includes(s.id);
               return (
-                <label key={s.id} className={`check-item ${on ? 'checked' : ''}`}>
+                <label key={s.id} className={`check-item ${on ? 'checked' : ''}`} style={stageStyle(s.stage)}>
                   <input type="checkbox" checked={on} onChange={() => toggle(s.id)} />
-                  <span style={{ fontSize: 22 }} aria-hidden>{s.emoji}</span>
+                  <span className="check-item__emoji" aria-hidden>{s.emoji}</span>
                   <span className="grow">
                     <b>{s.title}</b>
                     <br />

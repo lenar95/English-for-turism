@@ -2240,7 +2240,18 @@ details[open] summary .chev {
 }
 
 .arena .sticky-footer {
-  background: none;
+  /* Подложка в цвет низа градиента: кнопки читаются поверх прокручиваемых карточек. */
+  background: linear-gradient(to top, var(--arena-b) 72%, transparent);
+  margin-left: -16px;
+  margin-right: -16px;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .arena .sticky-footer {
+    background: linear-gradient(to top, color-mix(in srgb, var(--arena-b) 45%, #0d0f14) 72%, transparent);
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -2302,4 +2313,88 @@ details[open] summary .chev {
   .arena {
     transition: none;
   }
+}
+
+/* ---------- Онбординг на «арене» ---------- */
+.arena--onb-0 { --arena-a: #1e7fe0; --arena-b: #26b6dc; }
+.arena--onb-1 { --arena-a: #3f6de6; --arena-b: #2a9fe6; }
+.arena--onb-2 { --arena-a: #16b88c; --arena-b: #22bcc4; }
+
+.onboarding {
+  max-width: 560px;
+}
+
+.arena .steps span {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.arena .steps span.active {
+  background: #fff;
+}
+
+.arena .muted,
+.arena .section-title,
+.arena .field label {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.arena .card .muted,
+.arena .card .field label,
+.arena .check-item .muted,
+.arena .option .muted,
+.arena .feedback .muted,
+.arena .bubble--them .muted {
+  color: var(--text-2);
+}
+
+.arena .card b {
+  color: var(--text);
+}
+
+.onb-plane {
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56px;
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.12);
+}
+
+/* Выбор ситуаций: иконка в цвете этапа, отмеченная карточка подсвечена тем же цветом. */
+.check-item__emoji {
+  font-size: 22px;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--stage) 14%, var(--surface));
+}
+
+.check-item input {
+  accent-color: var(--stage, var(--primary));
+}
+
+.check-item.checked {
+  border-color: var(--stage, var(--primary));
+  background: color-mix(in srgb, var(--stage, var(--primary)) 8%, var(--surface));
+}
+
+.arena .check-item {
+  color: var(--text);
+  background: var(--surface);
+  border-radius: 20px;
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 6px var(--glass);
+  margin: 4px 0;
+}
+
+.arena .check-item.checked {
+  border-color: var(--stage);
+  background: color-mix(in srgb, var(--stage) 8%, var(--surface));
 }
