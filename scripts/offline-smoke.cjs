@@ -42,9 +42,17 @@ async function main() {
         try {
           await page.waitForSelector(selector, { timeout: 10000 });
         } catch (cause) {
-          const body = await page.evaluate(() => document.body.innerText.slice(0, 400)).catch(() => '(нет body)');
+          const info = await page
+            .evaluate(() => ({
+              readyState: document.readyState,
+              href: location.href,
+              controller: navigator.serviceWorker.controller ? navigator.serviceWorker.controller.scriptURL : null,
+              rootHtml: (document.getElementById('root') || {}).innerHTML?.slice(0, 300) ?? '(нет #root)',
+              bodyText: document.body.innerText.slice(0, 300),
+            }))
+            .catch((e) => ({ evaluateError: String(e) }));
           throw new Error(
-            `${what}: не дождались «${selector}» по адресу ${page.url()}\n--- текст страницы ---\n${body}\n--- консоль ---\n${messages.slice(-15).join('\n')}`,
+            `${what}: не дождались «${selector}» по адресу ${page.url()}\n--- страница ---\n${JSON.stringify(info, null, 2)}\n--- ошибки страницы ---\n${errors.join('\n') || '(нет)'}\n--- консоль ---\n${messages.slice(-15).join('\n') || '(пусто)'}`,
             { cause },
           );
         }
