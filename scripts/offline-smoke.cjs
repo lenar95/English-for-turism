@@ -28,10 +28,26 @@ async function main() {
       });
       const page = await context.newPage();
       const errors = [];
+      const console_ = [];
       page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
       page.on('console', (m) => {
+        console_.push(`${m.type()}: ${m.text()}`);
         if (m.type() === 'error') errors.push(`console: ${m.text()}`);
       });
+      /** Переход внутри приложения (HashRouter) и ожидание элемента с подробной диагностикой при сбое. */
+      const open = async (hash, selector, what) => {
+        await page.evaluate((h) => {
+          location.hash = h;
+        }, hash);
+        try {
+          await page.waitForSelector(selector, { timeout: 10000 });
+        } catch (e) {
+          const body = await page.evaluate(() => document.body.innerText.slice(0, 400)).catch(() => '(нет body)');
+          throw new Error(
+            `${what}: не дождались «${selector}» по адресу ${page.url()}\n--- текст страницы ---\n${body}\n--- консоль ---\n${console_.slice(-15).join('\n')}`,
+          );
+        }
+      };
 
       let opened = false;
       for (let i = 0; i < 40 && !opened; i++) {
@@ -59,11 +75,9 @@ async function main() {
       await page.reload({ waitUntil: 'load' });
       await page.waitForSelector('section.pass', { timeout: 10000 });
       console.log('офлайн: главная открылась');
-      await page.goto(`${BASE}/#/phrasebook`, { waitUntil: 'load' });
-      await page.waitForSelector('text=Hello!', { timeout: 10000 });
+      await open('#/phrasebook', 'article.phrase', 'разговорник');
       console.log(`офлайн: разговорник открылся, карточек: ${await page.locator('article.phrase').count()}`);
-      await page.goto(`${BASE}/#/scenario/hotel-checkin`, { waitUntil: 'load' });
-      await page.waitForSelector('text=Заселение', { timeout: 10000 });
+      await open('#/scenario/hotel-checkin', 'section.scenario-hero', 'страница ситуации');
       console.log('офлайн: страница ситуации открылась');
 
       const unexpected = errors.filter((e) => !/api\/health|ERR_INTERNET_DISCONNECTED|Failed to load resource/.test(e));
