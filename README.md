@@ -104,7 +104,10 @@ Museum Pass, вход в Археологический музей через п
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # юнит-тесты: оценка произношения, память, готовность, упражнения, целостность контента
+npm test           # юнит-тесты: оценка произношения, память, готовность, упражнения, состояние, целостность контента
+npm run lint       # oxlint: правила хуков React, ошибки корректности
+npm run knip       # неиспользуемые файлы, экспорты и зависимости
+npm run typecheck  # tsc для браузерной части (tsconfig.web.json) и для сервера со скриптами (tsconfig.node.json)
 npm run build      # сборка в dist/
 ```
 
@@ -164,7 +167,7 @@ npm run ios:open   # открыть проект в Xcode
 [`@capacitor/preferences`](https://capacitorjs.com/docs/apis/preferences) (хранение прогресса, которое iOS
 не очищает, в отличие от localStorage в WebView).
 
-CI (`.github/workflows/ci.yml`) на каждый пуш прогоняет тесты и собирает веб-версию. iOS-проект под симулятор
+CI (`.github/workflows/ci.yml`) на каждый пуш прогоняет линтер, knip и тесты и собирает веб-версию. iOS-проект под симулятор
 на macOS-раннере собирается только для `main` и pull request'ов.
 
 ## Структура
@@ -182,7 +185,7 @@ src/
     readiness.ts          расчёт готовности
     exercises.ts          генерация тренировок и проверок
     speech/               озвучка и распознавание (веб и iOS)
-  state/                  состояние приложения и хранилище
+  state/                  состояние приложения, миграция данных и хранилище
   components/             карточки фраз, упражнения, проверка произношения…
   pages/                  экраны
 ios/                      Xcode-проект (Capacitor)

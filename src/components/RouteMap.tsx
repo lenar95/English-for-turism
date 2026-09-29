@@ -21,9 +21,9 @@ function groupByStage(list: Scenario[]): Group[] {
     if (stage.id === 'city') {
       const byCity = new Map<string, Scenario[]>();
       for (const s of list) if (s.cityId) byCity.set(s.cityId, [...(byCity.get(s.cityId) ?? []), s]);
-      for (const [cityId, items] of byCity) {
+      for (const [cityId, cityItems] of byCity) {
         const city = cityById[cityId];
-        groups.push({ key: cityId, title: city ? `${city.emoji} ${city.name}` : cityId, stage: 'destination', scenarios: items });
+        groups.push({ key: cityId, title: city ? `${city.emoji} ${city.name}` : cityId, stage: 'destination', scenarios: cityItems });
       }
     }
   }

@@ -62,8 +62,8 @@ export function ExerciseRunner({ source, kind, mode, onFinish, onExit }: Props) 
   const record = (o: Outcome) => {
     const checks = exerciseChecks(o.exercise.type);
     if (checks.memory && o.memoryCorrect !== undefined) {
-      const kind = o.exercise.type === 'choose-en' || o.exercise.type === 'listen' ? 'recognition' : 'recall';
-      app.answer(o.exercise.phrase.id, o.memoryCorrect, kind);
+      const answerKind = o.exercise.type === 'choose-en' || o.exercise.type === 'listen' ? 'recognition' : 'recall';
+      app.answer(o.exercise.phrase.id, o.memoryCorrect, answerKind);
     }
     if (checks.pronunciation && o.pronScore !== undefined) {
       app.pronunciation(o.exercise.phrase.id, o.pronScore);

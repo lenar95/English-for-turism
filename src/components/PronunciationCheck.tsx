@@ -32,11 +32,13 @@ export function PronunciationCheck({ targets, onResult, showWords = true, compac
   const session = useRef<ListenSession | null>(null);
 
   useEffect(() => () => session.current?.abort(), []);
+  // Новая фраза — сбрасываем результат предыдущей.
+  const targetKey = targets.join('|');
   useEffect(() => {
     setResult(null);
     setStatus('idle');
     setPartial('');
-  }, [targets.join('|')]);
+  }, [targetKey]);
 
   if (!speechSupported || !data.settings.pronunciation) {
     return (
