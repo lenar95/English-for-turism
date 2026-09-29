@@ -15,6 +15,8 @@ const PORT = Number(process.env.PORT ?? 8787);
 const DATA_DIR = process.env.DATA_DIR ?? './data';
 const SUBJECT = process.env.VAPID_SUBJECT ?? 'https://engtrip.ru';
 const MAX_SUBSCRIBERS = 50000;
+/** Через сколько повторять отправку после временного сбоя (5xx, сеть). */
+const RETRY_MS = 10 * 60_000;
 
 const store = new Store(DATA_DIR);
 
@@ -81,20 +83,24 @@ function send(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
-async function push(sub: Subscriber, msg: Message): Promise<boolean> {
+/** sent — доставлено push-сервису; gone — подписка удалена; retry — временный сбой; failed — сегодня не выйдет. */
+type PushResult = 'sent' | 'gone' | 'retry' | 'failed';
+
+async function push(sub: Subscriber, msg: Message): Promise<PushResult> {
   try {
     await webpush.sendNotification(sub.subscription, JSON.stringify(msg), { TTL: 6 * 3600, urgency: 'normal' });
-    return true;
+    return 'sent';
   } catch (err) {
     const code = (err as { statusCode?: number }).statusCode;
     if (code === 404 || code === 410) {
       // Подписка больше не действует (удалили приложение, отозвали разрешение).
       store.delete(sub.id);
       console.log(`подписка ${sub.id.slice(0, 8)} удалена (${code})`);
-    } else {
-      console.warn(`ошибка отправки ${sub.id.slice(0, 8)}: ${code ?? String(err)}`);
+      return 'gone';
     }
-    return false;
+    console.warn(`ошибка отправки ${sub.id.slice(0, 8)}: ${code ?? String(err)}`);
+    // Сеть, 5xx и 429 — временные: попробуем позже в том же окне. Остальное — ошибка подписки.
+    return code === undefined || code >= 500 || code === 429 ? 'retry' : 'failed';
   }
 }
 
@@ -154,32 +160,52 @@ const server = createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
     if (url === '/api/push/test') {
-      const ok = await push(existing, {
-        type: 'test',
-        title: 'Напоминания работают ✓',
-        body: `Будем напоминать в ${existing.time}, если в этот день вы ещё не занимались.`,
-        url: '/#/',
-      });
+      const ok =
+        (await push(existing, {
+          type: 'test',
+          title: 'Напоминания работают ✓',
+          body: `Будем напоминать в ${existing.time}, если в этот день вы ещё не занимались.`,
+          url: '/#/',
+        })) === 'sent';
       return send(res, ok ? 200 : 502, { ok });
     }
     return send(res, 404, { error: 'not found' });
   } catch (err) {
-    return send(res, 400, { error: String((err as Error).message ?? err) });
+    // Подробности — в журнал, клиенту — общий ответ без внутренних сообщений.
+    console.warn(`плохой запрос ${req.method} ${url}: ${(err as Error).message ?? String(err)}`);
+    return send(res, 400, { error: 'bad request' });
   }
 });
 
-/** Раз в минуту проверяем, кому пора напомнить. */
+/** Раз в минуту проверяем, кому пора напомнить. День отмечаем отправленным только после отправки. */
 async function tick() {
   const now = Date.now();
   for (const sub of store.all()) {
     const msg = decide(sub, now);
     if (!msg) continue;
+    const result = await push(sub, msg);
+    if (result === 'gone') continue;
+    if (result === 'retry') {
+      sub.retryAt = now + RETRY_MS;
+      store.set(sub);
+      continue;
+    }
     sub.lastSentDay = localNow(now, sub.tz).date;
     sub.variant = (sub.variant + 1) % 1000;
+    sub.retryAt = undefined;
     store.set(sub);
-    if (await push(sub, msg)) console.log(`напоминание «${msg.type}» → ${sub.id.slice(0, 8)}`);
+    if (result === 'sent') console.log(`напоминание «${msg.type}» → ${sub.id.slice(0, 8)}`);
   }
 }
 
 setInterval(() => void tick().catch((e) => console.error('tick', e)), 60_000);
 server.listen(PORT, '127.0.0.1', () => console.log(`Сервис напоминаний: 127.0.0.1:${PORT}, подписчиков: ${store.size}`));
+
+// systemd останавливает службу сигналом: дописываем отложенные изменения, иначе они пропадут.
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.on(signal, () => {
+    server.close();
+    store.flush();
+    process.exit(0);
+  });
+}

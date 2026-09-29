@@ -29,6 +29,8 @@ export interface Subscriber {
   tz: string;
   snapshot: Snapshot;
   lastSentDay?: string;
+  /** Отправка не удалась по временной причине — не раньше этого момента пробуем снова. */
+  retryAt?: number;
   variant: number;
   createdAt: number;
   updatedAt: number;
@@ -106,6 +108,7 @@ const URLS: Record<Exclude<MessageType, 'test'>, string> = {
 
 /** Решить, отправлять ли напоминание сейчас. null — не отправлять. */
 export function decide(sub: Subscriber, now: number): Message | null {
+  if (sub.retryAt !== undefined && now < sub.retryAt) return null;
   const { date, minutes } = localNow(now, sub.tz);
   const at = parseTime(sub.time);
   if (minutes < at || minutes > at + 180) return null;

@@ -52,6 +52,11 @@ describe('расписание напоминаний', () => {
     expect(decide(sub({}, { lastActiveDay: '2026-09-10' }), NOW)).toBeNull();
   });
 
+  it('после временного сбоя отправки ждёт назначенного момента', () => {
+    expect(decide(sub({ retryAt: NOW + 60_000 }), NOW)).toBeNull();
+    expect(decide(sub({ retryAt: NOW - 1 }), NOW)).not.toBeNull();
+  });
+
   it('перед вылетом напоминает даже после долгого перерыва', () => {
     expect(decide(sub({}, { lastActiveDay: '2026-09-10', tripDate: '2026-10-02' }), NOW)!.type).toBe('tomorrow');
   });

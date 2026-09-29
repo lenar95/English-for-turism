@@ -42,12 +42,17 @@ export class Store {
   /** Отложенная запись с атомарной заменой файла. */
   save(): void {
     if (this.timer) return;
-    this.timer = setTimeout(() => {
-      this.timer = null;
-      const tmp = `${this.file}.tmp`;
-      writeFileSync(tmp, JSON.stringify(this.all()));
-      renameSync(tmp, this.file);
-    }, 500);
+    this.timer = setTimeout(() => this.flush(), 500);
+  }
+
+  /** Записать немедленно (при остановке службы отложенная запись не успела бы). */
+  flush(): void {
+    if (!this.timer) return;
+    clearTimeout(this.timer);
+    this.timer = null;
+    const tmp = `${this.file}.tmp`;
+    writeFileSync(tmp, JSON.stringify(this.all()));
+    renameSync(tmp, this.file);
   }
 
   readJson<T>(name: string): T | null {
