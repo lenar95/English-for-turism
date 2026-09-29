@@ -78,17 +78,25 @@ export async function speak(text: string, { accent, slow, lang }: SpeakOptions):
     u.rate = rate;
     const voice = pickVoice(language);
     if (voice) u.voice = voice;
+    // Страховка: в некоторых браузерах onend не приходит. Тогда считаем озвучку законченной
+    // и снимаем её, чтобы зависший синтез не держал аудио и не мешал микрофону.
+    const guard = setTimeout(() => {
+      if (synth.speaking) synth.cancel();
+      lastAudioAt = Date.now();
+      diag('озвучка: onend не пришёл, снята по таймауту');
+      resolve();
+    }, 1500 + (clean.length * 120) / rate);
     u.onend = () => {
+      clearTimeout(guard);
       lastAudioAt = Date.now();
       resolve();
     };
     u.onerror = () => {
+      clearTimeout(guard);
       lastAudioAt = Date.now();
       resolve();
     };
     synth.speak(u);
-    // Страховка: в некоторых браузерах onend не приходит.
-    setTimeout(resolve, 1500 + clean.length * 120 / rate);
   });
 }
 

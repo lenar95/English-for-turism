@@ -1,6 +1,7 @@
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { SpeechRecognition as NativeRecognition } from '@capgo/capacitor-speech-recognition';
 import { diag } from './diag';
+import { initialState, step, type RecEffect, type RecEvent, type RecognitionErrorCode, type TimerName } from './recognitionMachine';
 import { msSinceSpeech } from './tts';
 
 /**
@@ -9,13 +10,7 @@ import { msSinceSpeech } from './tts';
  * нативный распознаватель Apple (SFSpeechRecognizer) через плагин Capacitor.
  */
 
-export type RecognitionErrorCode =
-  | 'unsupported'
-  | 'permission'
-  | 'no-speech'
-  | 'network'
-  | 'aborted'
-  | 'unknown';
+export type { RecognitionErrorCode };
 
 export class RecognitionError extends Error {
   constructor(public code: RecognitionErrorCode, message?: string) {
@@ -191,12 +186,19 @@ function takeRecognition(Ctor: WebRecognitionCtor, fresh: boolean): WebRecogniti
   return shared;
 }
 
+/** Все гипотезы распознавателя: для каждой — её вариант в каждом сегменте, склеенный в строку. */
+function alternativesOf(e: WebRecognitionEvent): string[] {
+  const segs = Array.from(e.results);
+  const maxAlt = Math.max(...segs.map((x) => x.length));
+  const alts: string[] = [];
+  for (let a = 0; a < maxAlt; a++) alts.push(segs.map((x) => (x[a] ?? x[0]).transcript).join(' ').trim());
+  return alts.filter(Boolean);
+}
+
 /**
- * Распознавание в браузере со страховками от зависаний:
- * - после паузы в речи (silenceMs) запись останавливается сама;
- * - если после остановки браузер не ответил (0,6–1,2 с) — берём то, что успело распознаться;
- * - если микрофон так и не заработал — перезапуск со свежим объектом (до 2 раз);
- * - если за 8 с не распознано ни слова — сообщаем «ничего не услышали», а не висим.
+ * Распознавание в браузере. Вся логика страховок от зависаний живёт в машине состояний
+ * (recognitionMachine.ts); здесь — только перевод событий браузера и таймеров в её события
+ * и исполнение её эффектов.
  */
 function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 }: ListenOptions): ListenSession {
   const Ctor = webCtor();
@@ -211,28 +213,10 @@ function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 
   activeWeb?.abort();
 
   const id = ++sessionSeq;
-  const log = (m: string) => diag(`#${id} ${m}`);
-  log('старт записи');
-
+  let state = initialState(strategy, emptyInRow);
+  const timers = new Map<TimerName, ReturnType<typeof setTimeout>>();
   let rec: WebRecognition | null = null;
-  let alternatives: string[] = [];
-  let error: RecognitionError | null = null;
-  let settled = false;
-  let aborted = false;
-  let audioStarted = false;
-  let speechHeard = false;
-  const startedAt = Date.now();
-  let restarts = 0;
-  const timers = new Set<ReturnType<typeof setTimeout>>();
-  const later = (fn: () => void, ms: number) => {
-    const t = setTimeout(() => {
-      timers.delete(t);
-      fn();
-    }, ms);
-    timers.add(t);
-    return t;
-  };
-  let silenceTimer: ReturnType<typeof setTimeout> | undefined;
+  const now = () => Date.now();
 
   let resolveResult!: (v: string[]) => void;
   let rejectResult!: (e: RecognitionError) => void;
@@ -246,156 +230,123 @@ function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 
     r.onaudiostart = r.onstart = r.onspeechstart = null;
   };
 
-  const finish = (why: string) => {
-    if (settled) return;
-    settled = true;
-    timers.forEach(clearTimeout);
-    timers.clear();
-    const r = rec;
-    rec = null;
-    if (r) {
-      detach(r);
-      // Браузер так и не сообщил об окончании — этому объекту больше не доверяем.
-      if (sharedRunning && r === shared) {
-        log('браузер не завершил запись — сбрасываем объект');
-        takeRecognition(Ctor, true);
-      }
-    }
-    if (activeWeb === session) activeWeb = null;
-    log(`конец (${why}): ${alternatives.length ? `«${alternatives[0]}»` : error ? `ошибка ${error.message}` : 'ничего'}`);
-    // Микрофон включился, но за 2,5+ с не пришло ни звука речи, ни текста — попытка «вхолостую».
-    if (!aborted && !alternatives.length && audioStarted && !speechHeard && Date.now() - startedAt > 2500) {
-      emptyInRow++;
-      log(`холостая попытка (${emptyInRow} подряд, режим ${strategy})`);
-      if (emptyInRow >= (strategy === 0 ? 1 : 2) && strategy < 2) {
-        setStrategy(strategy + 1, strategy === 0 ? 'держим микрофон открытым' : 'без промежуточных результатов, свежий объект');
-      }
-    } else if (alternatives.length) {
-      emptyInRow = 0;
-    }
-    if (aborted) rejectResult(new RecognitionError('aborted'));
-    else if (alternatives.length) resolveResult(alternatives);
-    // Ошибку «aborted» от самого браузера показываем как «не услышали», а не молча сбрасываем кнопку.
-    else rejectResult(error && error.code !== 'aborted' ? error : new RecognitionError('no-speech'));
-  };
-
-  /** Мягкая остановка: просим браузер закончить, но ждём недолго. */
-  const stop = () => {
-    if (settled) return;
-    log('стоп');
-    try {
-      rec?.stop();
-    } catch {
-      /* ignore */
-    }
-    later(() => finish('таймаут после стопа'), alternatives.length ? 600 : 1200);
-  };
-
-  const begin = (fresh: boolean) => {
-    if (settled) return;
-    const r = takeRecognition(Ctor, fresh || sharedRunning || strategy >= 2);
-    rec = r;
-    r.lang = lang;
-    r.interimResults = strategy < 2;
-    r.maxAlternatives = 5;
-    r.continuous = false;
-    r.onstart = () => log('onstart');
-    r.onaudiostart = () => {
-      audioStarted = true;
-      log('микрофон включился');
-    };
-    r.onspeechstart = () => {
-      speechHeard = true;
-      log('слышна речь');
-    };
-    r.onresult = (e) => {
-      audioStarted = true;
-      speechHeard = true;
-      // Склеиваем все сегменты: для каждой гипотезы берём её вариант в каждом сегменте.
-      const segs = Array.from(e.results);
-      const maxAlt = Math.max(...segs.map((x) => x.length));
-      const alts: string[] = [];
-      for (let a = 0; a < maxAlt; a++) {
-        alts.push(segs.map((x) => (x[a] ?? x[0]).transcript).join(' ').trim());
-      }
-      alternatives = alts.filter(Boolean);
-      log(`результат: «${alternatives[0] ?? ''}»`);
-      onPartial?.(alternatives[0] ?? '');
-      // Пауза после речи — фраза сказана, заканчиваем.
-      if (silenceTimer) {
-        clearTimeout(silenceTimer);
-        timers.delete(silenceTimer);
-      }
-      silenceTimer = later(stop, silenceMs);
-    };
-    r.onerror = (e) => {
-      log(`ошибка: ${e.error}`);
-      const map: Record<string, RecognitionErrorCode> = {
-        'not-allowed': 'permission',
-        'service-not-allowed': 'permission',
-        'no-speech': 'no-speech',
-        network: 'network',
-        aborted: 'aborted',
-      };
-      error = new RecognitionError(map[e.error] ?? 'unknown', e.error);
-      if (error.code === 'permission' || error.code === 'network') finish('ошибка');
-    };
+  const attach = (r: WebRecognition, run: number) => {
+    r.onstart = () => dispatch({ type: 'rec-start', now: now(), run });
+    r.onaudiostart = () => dispatch({ type: 'rec-audio', now: now(), run });
+    r.onspeechstart = () => dispatch({ type: 'rec-speech', now: now(), run });
+    r.onresult = (e) => dispatch({ type: 'rec-result', now: now(), run, alternatives: alternativesOf(e) });
+    r.onerror = (e) => dispatch({ type: 'rec-error', now: now(), run, error: e.error });
     r.onend = () => {
       sharedRunning = false;
-      log('onend');
-      finish('браузер завершил');
+      dispatch({ type: 'rec-end', now: now(), run });
     };
-    try {
-      r.start();
-      sharedRunning = true;
-    } catch (err) {
-      log(`start() не сработал: ${err instanceof Error ? err.name : String(err)}`);
-    }
-    // Микрофон так и не включился и ничего не распознано — пробуем свежий объект.
-    later(() => {
-      if (settled || rec !== r || audioStarted || alternatives.length || restarts >= 2) return;
-      restarts++;
-      log(`микрофон не включился за 2,5 с — перезапуск №${restarts}`);
-      detach(r);
-      later(() => begin(true), 300);
-    }, 2500);
   };
 
-  const session = {
+  const session: ListenSession = {
     result,
-    stop,
-    abort: () => {
-      if (settled) return;
-      aborted = true;
-      log('отмена');
-      try {
-        rec?.abort();
-      } catch {
-        /* ignore */
-      }
-      finish('отмена');
-    },
+    stop: () => dispatch({ type: 'stop', now: now() }),
+    abort: () => dispatch({ type: 'abort', now: now() }),
   };
+
+  const perform = (effect: RecEffect) => {
+    switch (effect.type) {
+      case 'log':
+        diag(`#${id} ${effect.message}`);
+        break;
+      case 'keepMic':
+        void keepMicOpen().then(() => dispatch({ type: 'mic-ready', now: now(), msSinceSpeech: msSinceSpeech() }));
+        break;
+      case 'timer': {
+        const { name } = effect;
+        clearTimeout(timers.get(name));
+        timers.set(
+          name,
+          setTimeout(() => {
+            timers.delete(name);
+            dispatch({ type: 'timer', now: now(), name });
+          }, effect.ms),
+        );
+        break;
+      }
+      case 'clearTimer':
+        clearTimeout(timers.get(effect.name));
+        timers.delete(effect.name);
+        break;
+      case 'begin': {
+        const r = takeRecognition(Ctor, effect.fresh || sharedRunning || state.strategy >= 2);
+        rec = r;
+        r.lang = lang;
+        r.interimResults = effect.interim;
+        r.maxAlternatives = 5;
+        r.continuous = false;
+        attach(r, effect.run);
+        try {
+          r.start();
+          sharedRunning = true;
+        } catch (err) {
+          dispatch({ type: 'rec-start-failed', now: now(), run: effect.run, message: err instanceof Error ? err.name : String(err) });
+        }
+        break;
+      }
+      case 'stopRec':
+        try {
+          rec?.stop();
+        } catch {
+          /* ignore */
+        }
+        break;
+      case 'abortRec':
+        try {
+          rec?.abort();
+        } catch {
+          /* ignore */
+        }
+        break;
+      case 'detachRec':
+        if (rec) detach(rec);
+        break;
+      case 'finish': {
+        timers.forEach((t) => clearTimeout(t));
+        timers.clear();
+        const r = rec;
+        rec = null;
+        if (r) {
+          detach(r);
+          // Браузер так и не сообщил об окончании — этому объекту больше не доверяем.
+          if (sharedRunning && r === shared) {
+            diag(`#${id} браузер не завершил запись — сбрасываем объект`);
+            takeRecognition(Ctor, true);
+          }
+        }
+        if (activeWeb === session) activeWeb = null;
+        break;
+      }
+      case 'partial':
+        onPartial?.(effect.text);
+        break;
+      case 'strategy':
+        setStrategy(effect.value, effect.why);
+        break;
+      case 'resolve':
+        resolveResult(effect.alternatives);
+        break;
+      case 'reject':
+        rejectResult(new RecognitionError(effect.code));
+        break;
+    }
+  };
+
+  const dispatch = (event: RecEvent) => {
+    if (state.phase === 'done') return;
+    const out = step(state, event, { silenceMs, maxMs });
+    state = out.state;
+    emptyInRow = state.emptyInRow;
+    for (const effect of out.effects) perform(effect);
+  };
+
   activeWeb = session;
-  log(`режим ${strategy}`);
-  // iOS строже к микрофону, если запись начинается не прямо в обработчике нажатия,
-  // поэтому по возможности стартуем синхронно.
-  const wait = Math.max(0, 500 - msSinceSpeech());
-  const needMic = strategy >= 1 && !(micStream && micStream.getAudioTracks().some((t) => t.readyState === 'live'));
-  if (needMic) {
-    void keepMicOpen().then(() => later(() => begin(false), Math.max(0, 500 - msSinceSpeech())));
-  } else if (wait) {
-    // Только что звучала озвучка — даём браузеру переключить аудио с динамика на микрофон.
-    log(`пауза ${wait} мс после озвучки`);
-    later(() => begin(false), wait);
-  } else {
-    begin(false);
-  }
-  // Ни одного слова за 9 с — не висим, а сообщаем, что ничего не услышали.
-  later(() => {
-    if (!alternatives.length) finish('ничего не распознано за 9 с');
-  }, 9000);
-  later(stop, maxMs);
+  const micLive = Boolean(micStream && micStream.getAudioTracks().some((t) => t.readyState === 'live'));
+  dispatch({ type: 'start', now: now(), msSinceSpeech: msSinceSpeech(), micLive });
   return session;
 }
 
