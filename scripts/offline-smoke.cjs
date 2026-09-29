@@ -20,6 +20,12 @@ async function main() {
     const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' });
     try {
       const context = await browser.newContext();
+      // Пропускаем онбординг, как сделал бы вернувшийся пользователь. Скрипт выполняется до кода
+      // страницы при каждой загрузке, поэтому отложенная запись приложения его не перекроет.
+      await context.addInitScript(() => {
+        const KEY = 'CapacitorStorage.english-for-tourism:v1';
+        if (!localStorage.getItem(KEY)) localStorage.setItem(KEY, JSON.stringify({ version: 1, onboarded: true }));
+      });
       const page = await context.newPage();
       const errors = [];
       page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
@@ -38,10 +44,7 @@ async function main() {
       }
       if (!opened) throw new Error('vite preview не поднялся');
 
-      // Пропускаем онбординг, как сделал бы вернувшийся пользователь.
-      await page.evaluate(() =>
-        localStorage.setItem('CapacitorStorage.english-for-tourism:v1', JSON.stringify({ version: 1, onboarded: true })),
-      );
+      await page.waitForSelector('section.pass', { timeout: 10000 }); // главная, а не онбординг
       await page.evaluate(() => navigator.serviceWorker.ready);
       await sleep(2000); // прекэш заканчивается после activate
       const cached = await page.evaluate(async () => {
@@ -54,7 +57,7 @@ async function main() {
 
       await context.setOffline(true);
       await page.reload({ waitUntil: 'load' });
-      await page.waitForSelector('text=Английский в поездку', { timeout: 10000 });
+      await page.waitForSelector('section.pass', { timeout: 10000 });
       console.log('офлайн: главная открылась');
       await page.goto(`${BASE}/#/phrasebook`, { waitUntil: 'load' });
       await page.waitForSelector('text=Hello!', { timeout: 10000 });
