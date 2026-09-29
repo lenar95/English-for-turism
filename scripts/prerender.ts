@@ -119,7 +119,7 @@ function scenarioPath(s: Scenario): string {
 
 function scenarioPage(s: Scenario, city?: CityPack): PageMeta {
   const n = s.phrases.length;
-  const place = city ? ` в ${city.name === 'Стамбул' ? 'Стамбуле' : city.name}` : '';
+  const place = city ? ` ${city.nameIn}` : '';
   const title = `${s.title}${place} по-английски: ${n} ${plural(n, 'фраза', 'фразы', 'фраз')} с произношением`;
   const description = `${s.goal} Фразы на английском с переводом и произношением русскими буквами, советы и тренировка в приложении.`;
   const dialogue = s.dialogues[0];
@@ -206,7 +206,7 @@ ${citySection}`,
 }
 
 function cityPage(c: CityPack): PageMeta {
-  const inCity = c.name === 'Стамбул' ? 'Стамбула' : c.name;
+  const inCity = c.nameGen;
   const path = `/city/${c.id}/`;
   return {
     path,

@@ -12,6 +12,7 @@ import { RECALL_PASS_SCORE } from '../lib/exercises';
 import { hapticSuccess } from '../lib/haptics';
 import { localLearned, localProgressKey, localSession, type LocalItem } from '../lib/localPractice';
 import type { PronunciationResult } from '../lib/pronunciation';
+import { plural } from '../lib/ru';
 import { useApp } from '../state/AppContext';
 
 const SESSION_SIZE = 8;
@@ -262,7 +263,7 @@ function LocalResult({ city, outcomes, back, onRestart }: { city: CityPack; outc
       <TopBar back={back} title={`Тренировка ${city.localLanguage.name}`} />
       <div className="card stack pop" style={{ alignItems: 'center', position: 'relative' }}>
         {good && <Burst count={20} />}
-        <h2>{good ? 'Çok iyi! Отлично!' : 'Хорошее начало'}</h2>
+        <h2>{good ? `${city.localLanguage.praise} Отлично!` : 'Хорошее начало'}</h2>
         <Ring value={pron ?? Math.round((ok / Math.max(1, outcomes.length)) * 100)} size={120} label={pron === null ? 'результат' : 'произношение'} />
         <p className="center">
           Сказали сами: <b>{ok}</b> из {outcomes.length}
@@ -272,7 +273,7 @@ function LocalResult({ city, outcomes, back, onRestart }: { city: CityPack; outc
           тренировка попросит вспомнить их без подсказки — так они запомнятся надёжнее.
         </p>
         <button type="button" className="btn btn--block" onClick={onRestart}>
-          Ещё 8 фраз
+          Ещё {SESSION_SIZE} {plural(SESSION_SIZE, 'фраза', 'фразы', 'фраз')}
         </button>
         <Link className="btn btn--ghost btn--block" to={back}>
           Готово

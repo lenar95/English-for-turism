@@ -13,7 +13,10 @@ const PRESETS = [
 export function Reminders() {
   const app = useApp();
   const { settings } = app.data;
+  const { backend } = app;
   const support = pushSupport();
+  // Время имеет смысл выбирать только там, где напоминания могут работать.
+  const canRemind = support === 'ios-install' || (support === 'ok' && backend !== 'none');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
 
@@ -63,6 +66,8 @@ export function Reminders() {
         <p className="small muted">Этот браузер не поддерживает уведомления.</p>
       ) : support === 'native' ? (
         <p className="small muted">В iOS-приложении напоминания появятся в следующей версии.</p>
+      ) : backend === 'none' ? (
+        <p className="small muted">На этом адресе нет сервиса напоминаний, поэтому включить их здесь нельзя.</p>
       ) : (
         <>
           <p className="small muted">
@@ -72,13 +77,19 @@ export function Reminders() {
           <label className="switch-row">
             <span className="grow">Напоминать заниматься</span>
             <span className="switch">
-              <input type="checkbox" checked={settings.reminders} disabled={busy} onChange={(e) => void toggle(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={settings.reminders}
+                disabled={busy || backend === 'unknown'}
+                onChange={(e) => void toggle(e.target.checked)}
+              />
               <span />
             </span>
           </label>
         </>
       )}
 
+      {canRemind && (
       <div className="field">
         <label htmlFor="reminder-time">Когда вам удобно заниматься?</label>
         <p className="tiny muted" style={{ margin: 0 }}>
@@ -99,6 +110,7 @@ export function Reminders() {
         </div>
         <input id="reminder-time" className="input" type="time" value={settings.reminderTime} onChange={(e) => setTime(e.target.value)} />
       </div>
+      )}
 
       {settings.reminders && app.data.pushId && support === 'ok' && (
         <button

@@ -44,7 +44,7 @@ export function CityPage() {
         <div className="stack">
           <div className="banner banner--info">
             <IconCheck width={20} height={20} />
-            <span className="grow">Стамбул в вашей поездке: его ситуации учитываются в тренировках и готовности.</span>
+            <span className="grow">{city.name} в вашей поездке: его ситуации учитываются в тренировках и готовности.</span>
           </div>
           <button type="button" className="btn btn--ghost" onClick={() => updateTrip({ cityId: '' })}>
             Убрать город из поездки

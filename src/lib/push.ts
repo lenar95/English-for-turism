@@ -24,6 +24,21 @@ export function pushSupport(): PushSupport {
   return has ? 'ok' : 'unsupported';
 }
 
+export type BackendState = 'unknown' | 'ok' | 'none';
+let backendProbe: Promise<BackendState> | null = null;
+
+/**
+ * Есть ли за сайтом сервис напоминаний. На GitHub Pages его нет (на /api отдаётся страница),
+ * в нативном приложении напоминания пока не поддерживаются. Проверяется один раз за сеанс.
+ */
+export function probeBackend(): Promise<BackendState> {
+  if (Capacitor.isNativePlatform()) return Promise.resolve('none');
+  backendProbe ??= fetch('./api/health', { cache: 'no-store' })
+    .then((r): BackendState => (r.ok && (r.headers.get('content-type') ?? '').includes('json') ? 'ok' : 'none'))
+    .catch((): BackendState => 'none');
+  return backendProbe;
+}
+
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!('serviceWorker' in navigator) || Capacitor.isNativePlatform()) return null;
   try {

@@ -35,6 +35,9 @@ describe('контент', () => {
 
   it('городские наборы: у ситуаций задан город, id с префиксом города, есть местные слова', () => {
     for (const c of cities) {
+      expect(c.nameIn.trim()).not.toBe('');
+      expect(c.nameGen.trim()).not.toBe('');
+      expect(c.localLanguage.praise.trim()).not.toBe('');
       expect(c.localLanguage.words.length).toBeGreaterThan(0);
       for (const w of c.localLanguage.words) expect(w.tr).not.toMatch(/[a-z]/i);
       for (const s of c.scenarios) {

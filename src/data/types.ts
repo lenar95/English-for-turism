@@ -74,6 +74,10 @@ export interface LocalWord {
 export interface CityPack {
   id: string;
   name: string;
+  /** Предложный падеж для заголовков: «в Стамбуле». */
+  nameIn: string;
+  /** Родительный падеж: «ситуации Стамбула». */
+  nameGen: string;
   /** Код аэропорта для посадочного талона, например IST. */
   code: string;
   country: string;
@@ -87,6 +91,8 @@ export interface CityPack {
     name: string;
     /** BCP 47 для озвучки, например tr-TR. */
     lang: string;
+    /** Короткая похвала на местном языке для итога тренировки: «Çok iyi!». */
+    praise: string;
     note: string;
     words: LocalWord[];
   };

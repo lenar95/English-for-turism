@@ -707,6 +707,8 @@ const mosques: Scenario = {
 export const istanbul: CityPack = {
   id: 'istanbul',
   name: 'Стамбул',
+  nameIn: 'в Стамбуле',
+  nameGen: 'Стамбула',
   code: 'IST',
   country: 'Турция',
   emoji: '🇹🇷',
@@ -721,6 +723,7 @@ export const istanbul: CityPack = {
   localLanguage: {
     name: 'по-турецки',
     lang: 'tr-TR',
+    praise: 'Çok iyi!',
     note: 'Даже простое «Merhaba» и «Teşekkür ederim» сразу располагают собеседника — особенно в такси и на рынке.',
     words: [
       { text: 'Merhaba', ru: 'Здравствуйте', tr: 'Мерхаба' },

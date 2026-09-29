@@ -1,4 +1,5 @@
 import type { CityPack, Phrase } from '../data/types';
+import { isDue, memoryStrength } from './memory';
 import type { PhraseProgress } from './progress';
 
 /**
@@ -11,6 +12,9 @@ export const localProgressKey = (phraseId: string) => `${phraseId}@local`;
 /** С какого уровня памяти фразу нужно вспоминать самому, а не повторять за диктором. */
 export const LOCAL_RECALL_LEVEL = 2;
 
+/** Сколько новых фраз брать за сессию, когда уже есть что повторять. */
+export const LOCAL_NEW_PER_SESSION = 4;
+
 export interface LocalItem {
   phrase: Phrase;
   scenarioId: string;
@@ -18,32 +22,49 @@ export interface LocalItem {
   mode: 'repeat' | 'recall';
 }
 
-/** Фразы, которые говорит турист и у которых есть перевод, — в порядке «сначала слабые». */
+interface Located {
+  phrase: Phrase;
+  scenarioId: string;
+  order: number;
+}
+
+/**
+ * Сессия на местном языке: сначала повторение выученного (слабые и просроченные — первыми,
+ * той же формулой, что и в английской тренировке), потом немного новых фраз.
+ * Так фраза, разученная вчера, вернётся раньше, чем начнётся следующая порция новых,
+ * а не после того, как все фразы города будут начаты.
+ */
 export function localSession(
   city: CityPack,
   progress: Record<string, PhraseProgress>,
   size: number,
   scenarioId?: string,
+  now: number = Date.now(),
 ): LocalItem[] {
-  const pool = city.scenarios
+  const pool: Located[] = city.scenarios
     .filter((s) => !scenarioId || s.id === scenarioId)
     .flatMap((s) => s.phrases.filter((p) => p.speaker === 'you' && p.local).map((phrase, order) => ({ phrase, scenarioId: s.id, order })));
-  const level = (p: Phrase) => progress[localProgressKey(p.id)]?.memory.level ?? 0;
-  const last = (p: Phrase) => progress[localProgressKey(p.id)]?.memory.last ?? 0;
-  return pool
-    .sort(
-      (a, b) =>
-        level(a.phrase) - level(b.phrase) ||
-        Number(Boolean(b.phrase.key)) - Number(Boolean(a.phrase.key)) ||
-        last(a.phrase) - last(b.phrase) ||
-        a.order - b.order,
-    )
-    .slice(0, size)
-    .map(({ phrase, scenarioId: sid }) => ({
-      phrase,
-      scenarioId: sid,
-      mode: level(phrase) >= LOCAL_RECALL_LEVEL ? 'recall' : 'repeat',
-    }));
+  const memoryOf = (p: Phrase) => progress[localProgressKey(p.id)]?.memory;
+  const byKeyThenOrder = (a: Located, b: Located) => Number(Boolean(b.phrase.key)) - Number(Boolean(a.phrase.key)) || a.order - b.order;
+
+  const fresh = pool.filter((x) => !(memoryOf(x.phrase)?.reviews ?? 0)).sort(byKeyThenOrder);
+  const learned = pool
+    .filter((x) => (memoryOf(x.phrase)?.reviews ?? 0) > 0)
+    .map((x) => {
+      const m = memoryOf(x.phrase)!;
+      const priority = 1 - memoryStrength(m, now) + (x.phrase.key ? 0.3 : 0) + (isDue(m, now) ? 0.5 : 0);
+      return { x, m, priority };
+    })
+    .sort((a, b) => b.priority - a.priority || a.m.last - b.m.last || a.x.order - b.x.order)
+    .map((a) => a.x);
+
+  const newCount = Math.min(fresh.length, size, Math.max(LOCAL_NEW_PER_SESSION, size - learned.length));
+  const reviewCount = Math.min(learned.length, size - newCount);
+  return [...learned.slice(0, reviewCount), ...fresh.slice(0, newCount)].map(({ phrase, scenarioId: sid }) => ({
+    phrase,
+    scenarioId: sid,
+    mode: (memoryOf(phrase)?.level ?? 0) >= LOCAL_RECALL_LEVEL ? 'recall' : 'repeat',
+  }));
 }
 
 /** Сколько фраз города начато (уровень ≥ 1) и освоено (уровень ≥ 3) на местном языке. */
