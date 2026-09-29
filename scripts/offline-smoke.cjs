@@ -29,7 +29,7 @@ async function main() {
       const page = await context.newPage();
       const errors = [];
       const messages = [];
-      page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+      page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}\n${e.stack ?? ''}`));
       page.on('console', (m) => {
         messages.push(`${m.type()}: ${m.text()}`);
         if (m.type() === 'error') errors.push(`console: ${m.text()}`);
