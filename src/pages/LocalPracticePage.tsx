@@ -5,7 +5,7 @@ import { TopBar } from '../components/Layout';
 import { PronunciationCheck } from '../components/PronunciationCheck';
 import { Ring } from '../components/Readiness';
 import { SessionFrame } from '../components/SessionFrame';
-import { SpeakButtons } from '../components/Speak';
+import { NO_VOICE_HINT, SpeakButtons, useVoiceFor } from '../components/Speak';
 import { cityById, translationOf } from '../data';
 import type { CityPack } from '../data/types';
 import { RECALL_PASS_SCORE } from '../lib/thresholds';
@@ -133,6 +133,7 @@ function LocalCard({
   const [selfCheck, setSelfCheck] = useState(false);
   const passed = result !== null && result.score >= RECALL_PASS_SCORE;
   const usedHint = recall && hint > 0;
+  const voice = useVoiceFor(lang);
 
   const onResult = (r: PronunciationResult) => {
     // Засчитываем лучшую попытку.
@@ -162,7 +163,7 @@ function LocalCard({
         {hint >= 2 && (
           <div className="phrase__actions">
             <SpeakButtons text={local.text} lang={lang} autoPlay={!recall} />
-            {!recall && <span className="small muted">Сначала послушайте, как это звучит</span>}
+            {!recall && <span className="small muted">{voice.known && !voice.available ? NO_VOICE_HINT : 'Сначала послушайте, как это звучит'}</span>}
           </div>
         )}
         <span className="small muted" lang="en">

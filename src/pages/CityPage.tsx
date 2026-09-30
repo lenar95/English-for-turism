@@ -3,7 +3,7 @@ import { IconCheck, IconChevron, IconPlay } from '../components/Icons';
 import { TopBar } from '../components/Layout';
 import { Ring } from '../components/Readiness';
 import { ScenarioItem } from '../components/ScenarioItem';
-import { SpeakButtons } from '../components/Speak';
+import { NO_VOICE_HINT, SpeakButtons, useVoiceFor } from '../components/Speak';
 import { cityById } from '../data';
 import { localLearned } from '../lib/localPractice';
 import { scenarioReadiness, tripReadiness } from '../lib/readiness';
@@ -15,6 +15,7 @@ export function CityPage() {
   const { data, speechOn, updateTrip } = useApp();
   const now = useNow();
   const city = cityById[id];
+  const voice = useVoiceFor(city?.localLanguage.lang);
   if (!city) {
     return (
       <div className="page">
@@ -71,6 +72,12 @@ export function CityPage() {
       <section className="card stack">
         <h3>Пара слов {lang.name}</h3>
         <p className="small muted">{lang.note}</p>
+        {voice.known && !voice.available && (
+          <div className="banner banner--info">
+            <span aria-hidden>🔇</span>
+            <span>{NO_VOICE_HINT}</span>
+          </div>
+        )}
         <Link to={`/city/${city.id}/local`} className="btn btn--block">
           <IconPlay /> Тренировка {lang.name}
         </Link>

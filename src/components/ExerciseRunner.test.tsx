@@ -22,7 +22,13 @@ vi.mock('../lib/speech/recognition', () => ({
   listen: () => ({ result: Promise.reject(new Error('no mic in tests')), stop() {}, abort() {} }),
   recognitionErrorText: () => 'ошибка',
 }));
-vi.mock('../lib/speech/tts', () => ({ speak: async () => undefined, stopSpeaking: () => undefined, msSinceSpeech: () => 10_000 }));
+vi.mock('../lib/speech/tts', () => ({
+  speak: async () => undefined,
+  stopSpeaking: () => undefined,
+  msSinceSpeech: () => 10_000,
+  subscribeVoices: () => () => undefined,
+  voiceStatus: () => ({ known: true, available: true }),
+}));
 vi.mock('../lib/haptics', () => ({ hapticSuccess: () => undefined, hapticError: () => undefined }));
 vi.mock('./PronunciationCheck', () => ({
   // Микрофон в тестах заменён кнопкой: нажатие «говорит» фразу с заданной оценкой.

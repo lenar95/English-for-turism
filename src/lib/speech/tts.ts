@@ -21,6 +21,7 @@ const PREFERRED_VOICES = [
 ];
 
 let voicesCache: SpeechSynthesisVoice[] = [];
+const voiceListeners = new Set<() => void>();
 
 /** Когда последний раз звучала или была прервана озвучка — чтобы микрофон не включался в ту же секунду. */
 let lastAudioAt = 0;
@@ -29,8 +30,30 @@ export const msSinceSpeech = () => Date.now() - lastAudioAt;
 function loadVoices(): SpeechSynthesisVoice[] {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return [];
   const list = window.speechSynthesis.getVoices();
-  if (list.length) voicesCache = list;
+  if (list.length) {
+    const changed = list.length !== voicesCache.length;
+    voicesCache = list;
+    if (changed) voiceListeners.forEach((l) => l());
+  }
   return voicesCache;
+}
+
+/** Подписка на появление списка голосов (в Safari он приходит не сразу). */
+export function subscribeVoices(listener: () => void): () => void {
+  voiceListeners.add(listener);
+  return () => voiceListeners.delete(listener);
+}
+
+/**
+ * Есть ли голос для языка. known=false — список голосов ещё не пришёл, судить рано.
+ * На iPhone озвучка на языке без установленного голоса зависает и ломает звук страницы,
+ * поэтому такую озвучку пропускаем.
+ */
+export function voiceStatus(lang: string): { known: boolean; available: boolean } {
+  if (Capacitor.isNativePlatform()) return { known: true, available: true };
+  const voices = loadVoices();
+  if (!voices.length) return { known: false, available: true };
+  return { known: true, available: Boolean(pickVoice(lang)) };
 }
 
 if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -69,14 +92,20 @@ export async function speak(text: string, { accent, slow, lang }: SpeakOptions):
   }
   if (!ttsAvailable()) return;
   const synth = window.speechSynthesis;
+  const voice = pickVoice(language);
+  const voices = loadVoices();
+  if (lang && voices.length && !voice) {
+    diag(`озвучка (${language}) пропущена: голоса для этого языка нет (всего голосов ${voices.length})`);
+    return;
+  }
   synth.cancel();
   lastAudioAt = Date.now();
-  diag(`озвучка (${language}): «${clean.slice(0, 40)}»`);
+  const voiceInfo = voice ? `${voice.name} (${voice.lang}${voice.localService ? ', на устройстве' : ', сетевой'})` : `не выбран, голосов ${voices.length}`;
+  diag(`озвучка (${language}): «${clean.slice(0, 40)}» — голос ${voiceInfo}`);
   await new Promise<void>((resolve) => {
     const u = new SpeechSynthesisUtterance(clean);
     u.lang = language;
     u.rate = rate;
-    const voice = pickVoice(language);
     if (voice) u.voice = voice;
     // Страховка: в некоторых браузерах onend не приходит. Тогда считаем озвучку законченной
     // и снимаем её, чтобы зависший синтез не держал аудио и не мешал микрофону.
@@ -85,7 +114,7 @@ export async function speak(text: string, { accent, slow, lang }: SpeakOptions):
       lastAudioAt = Date.now();
       diag('озвучка: onend не пришёл, снята по таймауту');
       resolve();
-    }, 1500 + (clean.length * 120) / rate);
+    }, 3000 + (clean.length * 200) / rate);
     u.onend = () => {
       clearTimeout(guard);
       lastAudioAt = Date.now();
