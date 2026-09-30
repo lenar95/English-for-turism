@@ -34,6 +34,6 @@ export function diagClear(): void {
 }
 
 export function diagText(): string {
-  const head = `UA: ${typeof navigator !== 'undefined' ? navigator.userAgent : '-'}`;
+  const head = `UA: ${typeof navigator !== 'undefined' ? navigator.userAgent : '-'}\nсборка: ${__BUILD__}`;
   return [head, ...entries.map((e) => `${((e.t - started) / 1000).toFixed(2).padStart(7)}s  ${e.msg}`)].join('\n');
 }

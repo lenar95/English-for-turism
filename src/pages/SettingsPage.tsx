@@ -132,7 +132,7 @@ export function SettingsPage() {
           </div>
         )}
       </section>
-      <p className="tiny muted center">Английский в поездку · версия {__APP_VERSION__}</p>
+      <p className="tiny muted center">Английский в поездку · версия {__APP_VERSION__} · сборка {__BUILD__}</p>
     </div>
   );
 }

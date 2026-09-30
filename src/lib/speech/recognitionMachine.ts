@@ -43,7 +43,7 @@ export interface RecState {
 }
 
 export type RecEvent =
-  | { type: 'start'; now: number; msSinceSpeech: number; micLive: boolean }
+  | { type: 'start'; now: number; msSinceSpeech: number; micLive: boolean; lang?: string }
   | { type: 'mic-ready'; now: number; msSinceSpeech: number }
   | { type: 'timer'; now: number; name: TimerName }
   | { type: 'rec-start'; now: number; run: number }
@@ -180,7 +180,7 @@ export function step(state: RecState, event: RecEvent, opts: RecOptions): Out {
   switch (event.type) {
     case 'start': {
       s.startedAt = event.now;
-      log('старт записи');
+      log(`старт записи${event.lang ? ` (${event.lang})` : ''}`);
       log(`режим ${s.strategy}`);
       effects.push({ type: 'timer', name: 'noWords', ms: NO_WORDS_MS });
       effects.push({ type: 'timer', name: 'max', ms: opts.maxMs });
