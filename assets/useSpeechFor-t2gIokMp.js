@@ -1,0 +1,1 @@
+import{a as e,g as t,h as n,it as r,ot as i}from"./AppContext-VqClTyxq.js";var a=i(r(),1);function o(r){let{speechOn:i}=e(),o=(0,a.useSyncExternalStore)(t,()=>n(r),()=>!0);return i&&o}export{o as t};
