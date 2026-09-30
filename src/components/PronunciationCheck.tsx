@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { pronunciationVerdict, scorePronunciation, type PronunciationResult } from '../lib/pronunciation';
-import { listen, recognitionErrorText, type ListenSession } from '../lib/speech/recognition';
+import { listen, recognitionErrorText, recognitionStuck, type ListenSession } from '../lib/speech/recognition';
 import { stopSpeaking } from '../lib/speech/tts';
 import { PRON_BAD, PRON_GREAT } from '../lib/thresholds';
 import { useSettings } from '../state/AppContext';
@@ -30,6 +30,8 @@ export function PronunciationCheck({ targets, onResult, showWords = true, compac
   const [partial, setPartial] = useState('');
   const [result, setResult] = useState<PronunciationResult | null>(null);
   const [error, setError] = useState('');
+  // Несколько записей подряд без звука: на iPhone так бывает после озвучки, надёжно помогает перезагрузка.
+  const [stuck, setStuck] = useState(false);
   const session = useRef<ListenSession | null>(null);
 
   useEffect(() => () => session.current?.abort(), []);
@@ -84,6 +86,7 @@ export function PronunciationCheck({ targets, onResult, showWords = true, compac
         }
         setError(recognitionErrorText(err));
         setStatus('error');
+        setStuck(recognitionStuck());
       });
   };
 
@@ -115,6 +118,18 @@ export function PronunciationCheck({ targets, onResult, showWords = true, compac
           {hint}
         </p>
       </div>
+      {status === 'error' && stuck && (
+        <div className="banner banner--info">
+          <span aria-hidden>🎙</span>
+          <span className="grow">
+            Микрофон включается, но звука нет. На iPhone так бывает после озвучки. Перезагрузка страницы помогает,
+            прогресс сохранится.
+          </span>
+          <button type="button" className="btn btn--sm" onClick={() => location.reload()}>
+            Перезагрузить
+          </button>
+        </div>
+      )}
       {result && verdict && (
         <div className="pron__result pop" aria-live="polite">
           {result.score >= PRON_GREAT && <Burst />}

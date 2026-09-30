@@ -145,16 +145,16 @@ function keepMicOpen(): Promise<void> {
     .then((stream) => {
       micStream = stream;
       diag('микрофон удерживается открытым');
-      // iOS может заглушить или закрыть поток сама — пишем это в журнал, чтобы было видно в диагностике.
-      const release = (why: string) => {
-        if (micStream !== stream) return;
-        stream.getTracks().forEach((t) => t.stop());
-        micStream = null;
-        diag(`микрофон: ${why} — отпущен, следующая запись откроет его заново`);
-      };
+      // iOS глушит поток на время озвучки и обычно возвращает звук после неё, поэтому по mute
+      // поток не отпускаем, только пишем в журнал; закрытый системой поток отпускаем.
       for (const track of stream.getAudioTracks()) {
-        track.addEventListener('mute', () => release('система заглушила поток'));
-        track.addEventListener('ended', () => release('поток закрыт системой'));
+        track.addEventListener('mute', () => diag('микрофон: система заглушила поток'));
+        track.addEventListener('unmute', () => diag('микрофон: поток снова передаёт звук'));
+        track.addEventListener('ended', () => {
+          if (micStream !== stream) return;
+          micStream = null;
+          diag('микрофон: поток закрыт системой — следующая запись откроет его заново');
+        });
       }
     })
     .catch((err: unknown) => diag(`getUserMedia не сработал: ${err instanceof Error ? err.name : String(err)}`))
@@ -162,6 +162,61 @@ function keepMicOpen(): Promise<void> {
       micRequest = null;
     });
   return micRequest;
+}
+
+/**
+ * Лестница восстановления после холостых попыток (микрофон включился, звука нет).
+ * Так бывает на iPhone после озвучки: iOS глушит вход страницы и не возвращает его.
+ * Каждая следующая холостая попытка пробует более сильное средство и пишет это в журнал,
+ * чтобы по нему было видно, что помогло:
+ * 1 — отпустить удерживаемый микрофон и открыть заново;
+ * 2 — то же плюс попросить у iOS режим «запись и воспроизведение» (navigator.audioSession);
+ * 3 — дальше не удерживать микрофон вовсе.
+ * Если и это не помогает, надёжно помогает только перезагрузка страницы — её предлагает интерфейс.
+ */
+let holdMic = true;
+
+function releaseHeldMic(): void {
+  if (!micStream) return;
+  micStream.getTracks().forEach((t) => t.stop());
+  micStream = null;
+}
+
+function requestPlayAndRecord(): boolean {
+  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+  if (!session) return false;
+  try {
+    session.type = 'play-and-record';
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function recover(id: number): void {
+  // Синтез речи мог остаться «владельцем» звука после озвучки — на всякий случай снимаем.
+  try {
+    window.speechSynthesis?.cancel();
+  } catch {
+    /* ignore */
+  }
+  if (emptyInRow <= 1) {
+    releaseHeldMic();
+    diag(`#${id} восстановление 1: микрофон отпущен, следующая запись откроет его заново`);
+  } else if (emptyInRow === 2) {
+    releaseHeldMic();
+    const ok = requestPlayAndRecord();
+    diag(`#${id} восстановление 2: режим «запись и воспроизведение» ${ok ? 'запрошен' : 'недоступен'}, микрофон откроется заново`);
+  } else {
+    releaseHeldMic();
+    holdMic = false;
+    diag(`#${id} восстановление 3: дальше без удержания микрофона`);
+  }
+}
+
+/** Запись подряд несколько раз не слышит звука: интерфейс предлагает перезагрузить страницу. */
+export function recognitionStuck(): boolean {
+  return emptyInRow >= 2;
 }
 
 /** Активная запись в браузере: одновременно может идти только одна. */
@@ -336,11 +391,7 @@ function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 
         onPartial?.(effect.text);
         break;
       case 'releaseMic':
-        if (micStream) {
-          micStream.getTracks().forEach((t) => t.stop());
-          micStream = null;
-          diag(`#${id} микрофон отпущен — следующая запись откроет его заново`);
-        }
+        recover(id);
         break;
       case 'strategy':
         setStrategy(effect.value, effect.why);
@@ -366,7 +417,8 @@ function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 
   const track = micStream?.getAudioTracks()[0];
   const micLive = Boolean(track && track.readyState === 'live');
   if (track) diag(`#${id} удерживаемый микрофон: ${track.readyState}${track.muted ? ', заглушён' : ''}${track.enabled ? '' : ', выключен'}`);
-  dispatch({ type: 'start', now: now(), msSinceSpeech: msSinceSpeech(), micLive, lang });
+  // Если удержание микрофона решено не использовать (см. recover), машина сразу запускает запись.
+  dispatch({ type: 'start', now: now(), msSinceSpeech: msSinceSpeech(), micLive: holdMic ? micLive : true, lang });
   return session;
 }
 

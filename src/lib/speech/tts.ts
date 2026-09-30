@@ -71,7 +71,7 @@ export async function speak(text: string, { accent, slow, lang }: SpeakOptions):
   const synth = window.speechSynthesis;
   synth.cancel();
   lastAudioAt = Date.now();
-  diag(`озвучка: «${clean.slice(0, 40)}»`);
+  diag(`озвучка (${language}): «${clean.slice(0, 40)}»`);
   await new Promise<void>((resolve) => {
     const u = new SpeechSynthesisUtterance(clean);
     u.lang = language;
@@ -89,6 +89,9 @@ export async function speak(text: string, { accent, slow, lang }: SpeakOptions):
     u.onend = () => {
       clearTimeout(guard);
       lastAudioAt = Date.now();
+      // На iPhone после естественного окончания озвучки синтез может держать звук страницы —
+      // снимаем явно, чтобы микрофон получил его обратно.
+      synth.cancel();
       resolve();
     };
     u.onerror = () => {
