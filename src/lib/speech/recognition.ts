@@ -1,6 +1,7 @@
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { SpeechRecognition as NativeRecognition } from '@capgo/capacitor-speech-recognition';
 import { diag } from './diag';
+import { langSupported, noteLang } from './langSupport';
 import { initialState, step, type RecEffect, type RecEvent, type RecognitionErrorCode, type TimerName } from './recognitionMachine';
 import { msSinceSpeech } from './tts';
 
@@ -83,7 +84,13 @@ export function recognitionLikelyAvailable(): boolean {
 }
 
 export function listen(opts: ListenOptions = {}): ListenSession {
-  return Capacitor.isNativePlatform() ? listenNative(opts) : listenWeb(opts);
+  if (Capacitor.isNativePlatform()) return listenNative(opts);
+  // Язык, распознавание которого на этом устройстве зависает, больше не пробуем: это ломает и остальные языки.
+  if (!langSupported(opts.lang ?? 'en-US')) {
+    diag(`запись (${opts.lang ?? 'en-US'}) не начата: распознавание этого языка на устройстве не работает`);
+    return { result: Promise.reject(new RecognitionError('unsupported-lang')), stop() {}, abort() {} };
+  }
+  return listenWeb(opts);
 }
 
 /**
@@ -390,6 +397,9 @@ function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 
       case 'partial':
         onPartial?.(effect.text);
         break;
+      case 'emptyAttempt':
+        if (noteLang(lang, false)) diag(`#${id} язык ${lang} помечен как неподдерживаемый: две холостые попытки без единого успеха`);
+        break;
       case 'releaseMic':
         recover(id);
         break;
@@ -397,6 +407,7 @@ function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 
         setStrategy(effect.value, effect.why);
         break;
       case 'resolve':
+        noteLang(lang, true);
         resolveResult(effect.alternatives);
         break;
       case 'reject':
@@ -501,6 +512,8 @@ export function recognitionErrorText(err: unknown): string {
       return 'Нет доступа к микрофону. Разрешите его в настройках браузера или телефона.';
     case 'no-speech':
       return 'Ничего не услышали. Нажмите на микрофон и скажите фразу погромче.';
+    case 'unsupported-lang':
+      return 'Распознавание речи на этом языке на вашем устройстве не работает. Проверяйте себя сами.';
     case 'network':
       return 'Для распознавания речи нужен интернет. Проверьте подключение.';
     case 'aborted':

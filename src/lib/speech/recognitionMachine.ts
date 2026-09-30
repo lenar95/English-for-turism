@@ -19,7 +19,7 @@
  *   не помогает даже свежий объект распознавания. Следующая запись откроет микрофон заново.
  */
 
-export type RecognitionErrorCode = 'unsupported' | 'permission' | 'no-speech' | 'network' | 'aborted' | 'unknown';
+export type RecognitionErrorCode = 'unsupported' | 'unsupported-lang' | 'permission' | 'no-speech' | 'network' | 'aborted' | 'unknown';
 
 export type TimerName = 'begin' | 'silence' | 'afterStop' | 'restartCheck' | 'restartBegin' | 'noWords' | 'max';
 
@@ -73,6 +73,8 @@ export type RecEffect =
   | { type: 'strategy'; value: number; why: string }
   /** Отпустить удерживаемый микрофон: следующая запись откроет его заново. */
   | { type: 'releaseMic' }
+  /** Холостая попытка: микрофон включился, а речи и текста не было. */
+  | { type: 'emptyAttempt' }
   | { type: 'resolve'; alternatives: string[] }
   | { type: 'reject'; code: RecognitionErrorCode };
 
@@ -158,6 +160,7 @@ export function step(state: RecState, event: RecEvent, opts: RecOptions): Out {
     if (!s.aborted && !s.alternatives.length && s.audioStarted && !s.speechHeard && now - s.startedAt > EMPTY_ATTEMPT_MS) {
       s.emptyInRow += 1;
       log(`холостая попытка (${s.emptyInRow} подряд, режим ${s.strategy})`);
+      effects.push({ type: 'emptyAttempt' });
       if (s.strategy >= 1) effects.push({ type: 'releaseMic' });
       if (s.emptyInRow >= (s.strategy === 0 ? 1 : 2) && s.strategy < 2) {
         s.strategy += 1;

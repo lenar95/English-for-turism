@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { LocalVersion } from '../data';
 import { localProgressKey } from '../lib/localPractice';
 import { useActions } from '../state/AppContext';
+import { useSpeechFor } from '../lib/speech/useSpeechFor';
 import { IconMic } from './Icons';
 import { PronunciationCheck } from './PronunciationCheck';
 import { SpeakButtons } from './Speak';
@@ -10,6 +11,8 @@ import { SpeakButtons } from './Speak';
 export function LocalLine({ local, phraseId, canSpeak }: { local: LocalVersion; phraseId: string; canSpeak: boolean }) {
   const { pronunciation } = useActions();
   const [practice, setPractice] = useState(false);
+  const speech = useSpeechFor(local.lang);
+  const mic = canSpeak && speech;
   return (
     <div className="local-line">
       <div className="row" style={{ gap: 8 }}>
@@ -19,7 +22,7 @@ export function LocalLine({ local, phraseId, canSpeak }: { local: LocalVersion; 
           <span className="local-line__tr">{local.tr}</span>
         </div>
         <SpeakButtons text={local.text} lang={local.lang} />
-        {canSpeak && (
+        {mic && (
           <button
             type="button"
             className={`icon-btn ${practice ? 'icon-btn--primary' : ''}`}
@@ -32,7 +35,7 @@ export function LocalLine({ local, phraseId, canSpeak }: { local: LocalVersion; 
           </button>
         )}
       </div>
-      {practice && canSpeak && (
+      {practice && mic && (
         <PronunciationCheck
           targets={[local.text]}
           lang={local.lang}

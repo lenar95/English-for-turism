@@ -134,6 +134,15 @@ describe('машина распознавания', () => {
     expect(h3.state.emptyInRow).toBe(0);
   });
 
+  it('холостая попытка сообщается отдельным эффектом в любом режиме', () => {
+    for (const strategy of [0, 1, 2]) {
+      const h = new Harness(strategy, 0);
+      start(h, 0, 10_000, true);
+      h.send({ type: 'rec-audio', now: 100, run: h.state.run });
+      expect(h.types(h.send({ type: 'rec-end', now: 3000, run: h.state.run }))).toContain('emptyAttempt');
+    }
+  });
+
   it('в режимах с удерживаемым микрофоном холостая попытка отпускает микрофон', () => {
     for (const strategy of [1, 2]) {
       const h = new Harness(strategy, 0);

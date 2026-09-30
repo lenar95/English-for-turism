@@ -13,7 +13,8 @@ import { hapticSuccess } from '../lib/haptics';
 import { localLearned, localProgressKey, localSession, type LocalItem } from '../lib/localPractice';
 import type { PronunciationResult } from '../lib/pronunciation';
 import { plural } from '../lib/ru';
-import { useActions, useAppData, useSettings } from '../state/AppContext';
+import { useActions, useAppData } from '../state/AppContext';
+import { useSpeechFor } from '../lib/speech/useSpeechFor';
 import { useSessionLog } from '../state/useSessionLog';
 
 const SESSION_SIZE = 8;
@@ -49,7 +50,6 @@ export function LocalPracticePage() {
 
 function LocalRun({ city, scenarioId, onRestart }: { city: CityPack; scenarioId?: string; onRestart: () => void }) {
   const { data, ready } = useAppData();
-  const { speechOn } = useSettings();
   const { answer, pronunciation } = useActions();
   const navigate = useNavigate();
   const back = scenarioId ? `/scenario/${scenarioId}` : `/city/${city.id}`;
@@ -64,6 +64,8 @@ function LocalRun({ city, scenarioId, onRestart }: { city: CityPack; scenarioId?
   const index = outcomes.length;
   const item = items[index];
   const lang = city.localLanguage;
+  // Распознавание этого языка могло зависнуть на устройстве — тогда тренировка идёт с самопроверкой.
+  const speechOn = useSpeechFor(lang.lang);
   const session = useSessionLog('practice', items.length, { done: index, correct: outcomes.filter((o) => o.ok).length });
 
   const next = () => {

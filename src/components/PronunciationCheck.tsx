@@ -122,8 +122,8 @@ export function PronunciationCheck({ targets, onResult, showWords = true, compac
         <div className="banner banner--info">
           <span aria-hidden>🎙</span>
           <span className="grow">
-            Микрофон включается, но звука нет. На iPhone так бывает после озвучки. Перезагрузка страницы помогает,
-            прогресс сохранится.
+            Микрофон включается, но звука нет. На iPhone так бывает после озвучки или после записи на языке, который
+            телефон не распознаёт. Перезагрузка страницы помогает, прогресс сохранится.
           </span>
           <button type="button" className="btn btn--sm" onClick={() => location.reload()}>
             Перезагрузить
