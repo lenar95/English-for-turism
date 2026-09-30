@@ -1,5 +1,6 @@
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { SpeechRecognition as NativeRecognition } from '@capgo/capacitor-speech-recognition';
+import { beginRecording } from './audioSession';
 import { diag } from './diag';
 import { initialState, step, type RecEffect, type RecEvent, type RecognitionErrorCode, type TimerName } from './recognitionMachine';
 import { msSinceSpeech } from './tts';
@@ -83,7 +84,9 @@ export function recognitionLikelyAvailable(): boolean {
 }
 
 export function listen(opts: ListenOptions = {}): ListenSession {
-  return Capacitor.isNativePlatform() ? listenNative(opts) : listenWeb(opts);
+  if (Capacitor.isNativePlatform()) return listenNative(opts);
+  beginRecording();
+  return listenWeb(opts);
 }
 
 /**
@@ -135,9 +138,15 @@ if (typeof document !== 'undefined') {
   });
 }
 
+/** Поток микрофона работает: дорожка живая и не заглушена системой (например, после смены режима звука). */
+const micAlive = (s: MediaStream | null) => Boolean(s && s.getAudioTracks().some((t) => t.readyState === 'live' && !t.muted));
+
 /** Открыть микрофон и держать поток, пока открыта страница. */
 function keepMicOpen(): Promise<void> {
-  if (micStream && micStream.getAudioTracks().some((t) => t.readyState === 'live')) return Promise.resolve();
+  if (micAlive(micStream)) return Promise.resolve();
+  // Заглушённый поток отпускаем, иначе iOS держит значок записи и не отдаёт звук новому.
+  micStream?.getTracks().forEach((t) => t.stop());
+  micStream = null;
   if (micRequest) return micRequest;
   if (!navigator.mediaDevices?.getUserMedia) return Promise.resolve();
   micRequest = navigator.mediaDevices
@@ -345,7 +354,7 @@ function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 
   };
 
   activeWeb = session;
-  const micLive = Boolean(micStream && micStream.getAudioTracks().some((t) => t.readyState === 'live'));
+  const micLive = micAlive(micStream);
   dispatch({ type: 'start', now: now(), msSinceSpeech: msSinceSpeech(), micLive });
   return session;
 }

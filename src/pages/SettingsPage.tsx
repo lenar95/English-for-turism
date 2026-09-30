@@ -5,6 +5,11 @@ import { SpeakButtons } from '../components/Speak';
 import { SpeechDiagnostics } from '../components/SpeechDiagnostics';
 import { TripDetails, TripScenarioPicker } from '../components/TripEditor';
 import { useApp } from '../state/AppContext';
+import { Capacitor } from '@capacitor/core';
+
+const isIOSBrowser = () =>
+  !Capacitor.isNativePlatform() &&
+  (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 
 function Switch({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
   return (
@@ -70,6 +75,12 @@ export function SettingsPage() {
           <span className="grow small muted">Проверить звук:</span>
           <SpeakButtons text="Hello! Welcome to our hotel." />
         </div>
+        {isIOSBrowser() && (
+          <p className="tiny muted" style={{ margin: 0 }}>
+            Нет звука без наушников? На старых версиях iOS озвучку глушит переключатель «Без звука» сбоку телефона — сдвиньте
+            его, чтобы не было видно оранжевой полоски.
+          </p>
+        )}
         <Switch
           checked={s.showTranscription}
           onChange={(v) => updateSettings({ showTranscription: v })}

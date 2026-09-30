@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { TextToSpeech } from '@capacitor-community/text-to-speech';
+import { beginPlayback } from './audioSession';
 import { diag } from './diag';
 
 export type Accent = 'en-US' | 'en-GB';
@@ -21,6 +22,9 @@ const PREFERRED_VOICES = [
 ];
 
 let voicesCache: SpeechSynthesisVoice[] = [];
+
+/** Вернуть звук в обычный режим после текущей озвучки (см. audioSession.ts). */
+let endPlayback: (() => void) | null = null;
 
 /** Когда последний раз звучала или была прервана озвучка — чтобы микрофон не включался в ту же секунду. */
 let lastAudioAt = 0;
@@ -70,9 +74,18 @@ export async function speak(text: string, { accent, slow, lang }: SpeakOptions):
   if (!ttsAvailable()) return;
   const synth = window.speechSynthesis;
   synth.cancel();
+  endPlayback?.();
   lastAudioAt = Date.now();
   diag(`озвучка: «${clean.slice(0, 40)}»`);
-  await new Promise<void>((resolve) => {
+  // На iPhone без этого переключатель «Без звука» глушит озвучку на динамике.
+  const release = beginPlayback();
+  endPlayback = release;
+  await new Promise<void>((done) => {
+    const resolve = () => {
+      release();
+      if (endPlayback === release) endPlayback = null;
+      done();
+    };
     const u = new SpeechSynthesisUtterance(clean);
     u.lang = language;
     u.rate = rate;
@@ -106,5 +119,7 @@ export function stopSpeaking(): void {
   } else if (ttsAvailable()) {
     if (window.speechSynthesis.speaking) lastAudioAt = Date.now();
     window.speechSynthesis.cancel();
+    endPlayback?.();
+    endPlayback = null;
   }
 }
