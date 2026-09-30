@@ -134,6 +134,32 @@ describe('машина распознавания', () => {
     expect(h3.state.emptyInRow).toBe(0);
   });
 
+  it('в режимах с удерживаемым микрофоном холостая попытка отпускает микрофон', () => {
+    for (const strategy of [1, 2]) {
+      const h = new Harness(strategy, 0);
+      start(h, 0, 10_000, true);
+      h.send({ type: 'rec-audio', now: 100, run: h.state.run });
+      expect(h.types(h.send({ type: 'rec-end', now: 3000, run: h.state.run }))).toContain('releaseMic');
+    }
+    // В обычном режиме микрофон не удерживается — отпускать нечего.
+    const h0 = new Harness(0);
+    start(h0, 0);
+    h0.send({ type: 'rec-audio', now: 100, run: h0.state.run });
+    expect(h0.types(h0.send({ type: 'rec-end', now: 3000, run: h0.state.run }))).not.toContain('releaseMic');
+    // Удачная запись микрофон не трогает.
+    const ok = new Harness(2);
+    start(ok, 0, 10_000, true);
+    ok.send({ type: 'rec-result', now: 500, run: ok.state.run, alternatives: ['hello'] });
+    expect(ok.types(ok.send({ type: 'rec-end', now: 3000, run: ok.state.run }))).not.toContain('releaseMic');
+  });
+
+  it('следующая запись после отпущенного микрофона открывает его заново', () => {
+    const h = new Harness(2);
+    const first = start(h, 0, 10_000, false);
+    expect(h.types(first)).toContain('keepMic');
+    expect(h.types(first)).not.toContain('begin');
+  });
+
   it('режим 2 запускает без промежуточных результатов', () => {
     const h = new Harness(2);
     expect(start(h, 0, 10_000, true)).toContainEqual(expect.objectContaining({ type: 'begin', interim: false }));

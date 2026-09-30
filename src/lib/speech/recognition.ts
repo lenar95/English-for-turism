@@ -145,6 +145,12 @@ function keepMicOpen(): Promise<void> {
     .then((stream) => {
       micStream = stream;
       diag('микрофон удерживается открытым');
+      // iOS может заглушить или закрыть поток сама — пишем это в журнал, чтобы было видно в диагностике.
+      for (const track of stream.getAudioTracks()) {
+        track.addEventListener('mute', () => diag('микрофон: система заглушила поток'));
+        track.addEventListener('unmute', () => diag('микрофон: поток снова передаёт звук'));
+        track.addEventListener('ended', () => diag('микрофон: поток закрыт системой'));
+      }
     })
     .catch((err: unknown) => diag(`getUserMedia не сработал: ${err instanceof Error ? err.name : String(err)}`))
     .finally(() => {
@@ -324,6 +330,13 @@ function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 
       case 'partial':
         onPartial?.(effect.text);
         break;
+      case 'releaseMic':
+        if (micStream) {
+          micStream.getTracks().forEach((t) => t.stop());
+          micStream = null;
+          diag(`#${id} микрофон отпущен — следующая запись откроет его заново`);
+        }
+        break;
       case 'strategy':
         setStrategy(effect.value, effect.why);
         break;
@@ -345,7 +358,9 @@ function listenWeb({ lang = 'en-US', onPartial, silenceMs = 1500, maxMs = 12000 
   };
 
   activeWeb = session;
-  const micLive = Boolean(micStream && micStream.getAudioTracks().some((t) => t.readyState === 'live'));
+  const track = micStream?.getAudioTracks()[0];
+  const micLive = Boolean(track && track.readyState === 'live');
+  if (track) diag(`#${id} удерживаемый микрофон: ${track.readyState}${track.muted ? ', заглушён' : ''}${track.enabled ? '' : ', выключен'}`);
   dispatch({ type: 'start', now: now(), msSinceSpeech: msSinceSpeech(), micLive });
   return session;
 }

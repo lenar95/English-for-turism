@@ -13,7 +13,10 @@
  * - если за 9 с не распознано ни слова — «ничего не услышали», а не зависание;
  * - «холостая» попытка (микрофон включился, речи и текста нет) переключает режим работы:
  *   0 — обычный; 1 — держим микрофон открытым; 2 — то же, без промежуточных результатов
- *   и со свежим объектом на каждую запись.
+ *   и со свежим объектом на каждую запись;
+ * - в режимах с удерживаемым микрофоном холостая попытка ещё и отпускает его: iOS иногда
+ *   перестаёт отдавать звук через давно открытый поток, хотя тот выглядит живым, и тогда
+ *   не помогает даже свежий объект распознавания. Следующая запись откроет микрофон заново.
  */
 
 export type RecognitionErrorCode = 'unsupported' | 'permission' | 'no-speech' | 'network' | 'aborted' | 'unknown';
@@ -68,6 +71,8 @@ export type RecEffect =
   | { type: 'finish' }
   | { type: 'partial'; text: string }
   | { type: 'strategy'; value: number; why: string }
+  /** Отпустить удерживаемый микрофон: следующая запись откроет его заново. */
+  | { type: 'releaseMic' }
   | { type: 'resolve'; alternatives: string[] }
   | { type: 'reject'; code: RecognitionErrorCode };
 
@@ -153,6 +158,7 @@ export function step(state: RecState, event: RecEvent, opts: RecOptions): Out {
     if (!s.aborted && !s.alternatives.length && s.audioStarted && !s.speechHeard && now - s.startedAt > EMPTY_ATTEMPT_MS) {
       s.emptyInRow += 1;
       log(`холостая попытка (${s.emptyInRow} подряд, режим ${s.strategy})`);
+      if (s.strategy >= 1) effects.push({ type: 'releaseMic' });
       if (s.emptyInRow >= (s.strategy === 0 ? 1 : 2) && s.strategy < 2) {
         s.strategy += 1;
         s.emptyInRow = 0;
